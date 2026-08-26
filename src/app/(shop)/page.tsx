@@ -108,7 +108,7 @@ export default async function HomePage() {
 
       <footer className="bg-white border-t">
         <div className="max-w-7xl mx-auto px-4 py-8 text-center text-sm text-gray-500">
-          &copy; 2026 Miên Man. STARVIA COMPANY LIMITED.
+          &copy; 2026 Miên Man.
         </div>
       </footer>
     </main>
