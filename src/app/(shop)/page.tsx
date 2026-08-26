@@ -1,24 +1,11 @@
-import { getDB } from "@/lib/prisma";
+import { categories, products } from "@/lib/data";
 import Link from "next/link";
 
 function formatVND(price: number) {
   return price.toLocaleString("vi-VN") + "đ";
 }
 
-export default async function HomePage() {
-  const db = getDB();
-
-  const categories = await db.category.findMany({
-    where: { isActive: true },
-    orderBy: { sortOrder: "asc" },
-  });
-
-  const products = await db.product.findMany({
-    where: { isActive: true },
-    include: { category: true },
-    orderBy: { createdAt: "desc" },
-  });
-
+export default function HomePage() {
   return (
     <main className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm sticky top-0 z-50">
@@ -59,48 +46,45 @@ export default async function HomePage() {
       <section className="max-w-7xl mx-auto px-4 pb-16">
         <h2 className="text-xl font-semibold mb-4">Sản phẩm ({products.length})</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {products.map((product) => {
-            const images: string[] = JSON.parse(product.images);
-            return (
-              <Link
-                key={product.id}
-                href={`/product/${product.slug}`}
-                className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group"
-              >
-                <div className="aspect-[3/4] bg-gray-100 relative overflow-hidden">
-                  {images[0] && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={images[0]}
-                      alt={product.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                    />
-                  )}
+          {products.map((product) => (
+            <Link
+              key={product.id}
+              href={`/product/${product.slug}`}
+              className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group"
+            >
+              <div className="aspect-[3/4] bg-gray-100 relative overflow-hidden">
+                {product.images[0] && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={product.images[0]}
+                    alt={product.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                )}
+                {product.salePrice && (
+                  <span className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded">
+                    -{Math.round((1 - product.salePrice / product.price) * 100)}%
+                  </span>
+                )}
+              </div>
+              <div className="p-3">
+                <p className="text-xs text-gray-500 mb-1">{product.category?.name}</p>
+                <h3 className="text-sm font-medium text-gray-900 line-clamp-2 mb-2">
+                  {product.name}
+                </h3>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-red-600">
+                    {formatVND(product.salePrice || product.price)}
+                  </span>
                   {product.salePrice && (
-                    <span className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded">
-                      -{Math.round((1 - product.salePrice / product.price) * 100)}%
+                    <span className="text-xs text-gray-400 line-through">
+                      {formatVND(product.price)}
                     </span>
                   )}
                 </div>
-                <div className="p-3">
-                  <p className="text-xs text-gray-500 mb-1">{product.category?.name}</p>
-                  <h3 className="text-sm font-medium text-gray-900 line-clamp-2 mb-2">
-                    {product.name}
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-red-600">
-                      {formatVND(product.salePrice || product.price)}
-                    </span>
-                    {product.salePrice && (
-                      <span className="text-xs text-gray-400 line-through">
-                        {formatVND(product.price)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
+              </div>
+            </Link>
+          ))}
         </div>
       </section>
 
