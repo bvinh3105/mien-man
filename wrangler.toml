@@ -1,0 +1,9 @@
+name = "mien-man"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".vercel/output/static"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mien-man-db"
+database_id = "cec7cf07-54af-4ad3-bf1d-c3566b77bdfc"
