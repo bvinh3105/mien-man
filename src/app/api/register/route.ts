@@ -2,8 +2,6 @@ import { getDB } from "@/lib/prisma";
 import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
 
-export const runtime = "edge";
-
 export async function POST(req: Request) {
   const { email, password, fullName } = await req.json();
 

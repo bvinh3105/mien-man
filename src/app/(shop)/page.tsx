@@ -1,8 +1,6 @@
 import { getDB } from "@/lib/prisma";
 import Link from "next/link";
 
-export const runtime = "edge";
-
 function formatVND(price: number) {
   return price.toLocaleString("vi-VN") + "đ";
 }
