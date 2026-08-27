@@ -19,25 +19,25 @@ export interface Product {
 }
 
 export const categories: Category[] = [
-  { id: "cat-ao", name: "Áo", slug: "ao", description: "Các loại áo thời trang" },
-  { id: "cat-quan", name: "Quần", slug: "quan", description: "Các loại quần thời trang" },
-  { id: "cat-pk", name: "Phụ kiện", slug: "phu-kien", description: "Phụ kiện thời trang" },
-  { id: "cat-gd", name: "Giày dép", slug: "giay-dep", description: "Giày dép các loại" },
+  { id: "cat-tranh", name: "Thêu trên tranh", slug: "theu-tranh", description: "Tranh thêu tay tinh xảo" },
+  { id: "cat-ao", name: "Thêu trên quần áo", slug: "theu-quan-ao", description: "Thêu logo, tên, họa tiết" },
+  { id: "cat-tui", name: "Thêu trên túi", slug: "theu-tui", description: "Túi vải, túi canvas, túi da" },
+  { id: "cat-diy", name: "Tranh thêu tự làm", slug: "tu-lam", description: "Bộ nguyên liệu tự thêu tại nhà" },
 ];
 
 const catMap = Object.fromEntries(categories.map((c) => [c.id, c]));
 
 export const products: Product[] = [
-  { id: "p1", name: "Áo thun basic trắng", slug: "ao-thun-basic-trang", description: "Áo thun cotton 100% form regular fit", price: 199000, salePrice: 149000, stock: 50, images: ["https://placehold.co/600x800/f8f8f8/333?text=Ao+Thun+Trang"], categoryId: "cat-ao", category: catMap["cat-ao"] },
-  { id: "p2", name: "Áo thun basic đen", slug: "ao-thun-basic-den", description: "Áo thun cotton 100% form regular fit", price: 199000, salePrice: null, stock: 35, images: ["https://placehold.co/600x800/333/fff?text=Ao+Thun+Den"], categoryId: "cat-ao", category: catMap["cat-ao"] },
-  { id: "p3", name: "Áo sơ mi linen", slug: "ao-so-mi-linen", description: "Áo sơ mi chất liệu linen thoáng mát", price: 450000, salePrice: 389000, stock: 20, images: ["https://placehold.co/600x800/e8dcc8/333?text=So+Mi+Linen"], categoryId: "cat-ao", category: catMap["cat-ao"] },
-  { id: "p4", name: "Quần jeans slim fit", slug: "quan-jeans-slim-fit", description: "Quần jeans co giãn form slim fit", price: 550000, salePrice: 459000, stock: 30, images: ["https://placehold.co/600x800/4a6fa5/fff?text=Jeans+Slim"], categoryId: "cat-quan", category: catMap["cat-quan"] },
-  { id: "p5", name: "Quần kaki", slug: "quan-kaki", description: "Quần kaki form regular thoải mái", price: 399000, salePrice: null, stock: 40, images: ["https://placehold.co/600x800/c4a97d/333?text=Quan+Kaki"], categoryId: "cat-quan", category: catMap["cat-quan"] },
-  { id: "p6", name: "Quần short thể thao", slug: "quan-short-the-thao", description: "Quần short thể thao chất liệu thấm hút", price: 249000, salePrice: 199000, stock: 60, images: ["https://placehold.co/600x800/2d5a27/fff?text=Short+Sport"], categoryId: "cat-quan", category: catMap["cat-quan"] },
-  { id: "p7", name: "Nón bucket", slug: "non-bucket", description: "Nón bucket vải canvas phong cách", price: 159000, salePrice: null, stock: 100, images: ["https://placehold.co/600x800/8b6914/fff?text=Non+Bucket"], categoryId: "cat-pk", category: catMap["cat-pk"] },
-  { id: "p8", name: "Túi tote canvas", slug: "tui-tote-canvas", description: "Túi tote canvas dày dặn tiện lợi", price: 189000, salePrice: 149000, stock: 45, images: ["https://placehold.co/600x800/556b2f/fff?text=Tui+Tote"], categoryId: "cat-pk", category: catMap["cat-pk"] },
-  { id: "p9", name: "Giày sneaker trắng", slug: "giay-sneaker-trang", description: "Giày sneaker da trắng đế cao su", price: 750000, salePrice: 599000, stock: 25, images: ["https://placehold.co/600x800/f0f0f0/333?text=Sneaker+Trang"], categoryId: "cat-gd", category: catMap["cat-gd"] },
-  { id: "p10", name: "Dép quai ngang", slug: "dep-quai-ngang", description: "Dép quai ngang êm nhẹ phù hợp mọi lúc", price: 199000, salePrice: null, stock: 80, images: ["https://placehold.co/600x800/2f4f4f/fff?text=Dep+Quai+Ngang"], categoryId: "cat-gd", category: catMap["cat-gd"] },
+  { id: "p1", name: "Tranh thêu hoa sen", slug: "tranh-theu-hoa-sen", description: "Tranh thêu tay hoa sen truyền thống, kích thước 30x40cm, khung gỗ tự nhiên", price: 850000, salePrice: 720000, stock: 15, images: ["https://placehold.co/600x800/EEF1EA/556b2f?text=Hoa+Sen"], categoryId: "cat-tranh", category: catMap["cat-tranh"] },
+  { id: "p2", name: "Tranh thêu phong cảnh làng quê", slug: "tranh-theu-lang-que", description: "Tranh thêu phong cảnh đồng lúa, kích thước 40x60cm", price: 1200000, salePrice: null, stock: 8, images: ["https://placehold.co/600x800/D4DCCA/2f4f4f?text=Phong+Canh"], categoryId: "cat-tranh", category: catMap["cat-tranh"] },
+  { id: "p3", name: "Thêu tên lên áo phông", slug: "theu-ten-ao-phong", description: "Thêu tên, chữ ký hoặc logo nhỏ lên áo phông, font chữ đa dạng", price: 120000, salePrice: 99000, stock: 100, images: ["https://placehold.co/600x800/f8f8f8/556b2f?text=Ao+Phong"], categoryId: "cat-ao", category: catMap["cat-ao"] },
+  { id: "p4", name: "Thêu logo lên áo đồng phục", slug: "theu-logo-dong-phuc", description: "Thêu logo công ty, trường học lên áo đồng phục, đặt số lượng", price: 80000, salePrice: null, stock: 200, images: ["https://placehold.co/600x800/A8B496/fff?text=Dong+Phuc"], categoryId: "cat-ao", category: catMap["cat-ao"] },
+  { id: "p5", name: "Thêu họa tiết áo khoác", slug: "theu-hoa-tiet-ao-khoac", description: "Thêu hoa, chim, hình thú lên vai hoặc ngực áo khoác", price: 250000, salePrice: 199000, stock: 30, images: ["https://placehold.co/600x800/7D8B6A/fff?text=Ao+Khoac"], categoryId: "cat-ao", category: catMap["cat-ao"] },
+  { id: "p6", name: "Thêu tên lên túi tote", slug: "theu-tui-tote", description: "Thêu tên hoặc họa tiết theo yêu cầu lên túi tote canvas", price: 180000, salePrice: 149000, stock: 50, images: ["https://placehold.co/600x800/556b2f/fff?text=Tui+Tote"], categoryId: "cat-tui", category: catMap["cat-tui"] },
+  { id: "p7", name: "Thêu trên túi da nhỏ", slug: "theu-tui-da", description: "Thêu hoa nhỏ hoặc chữ tắt lên túi da, tinh tế và sang trọng", price: 320000, salePrice: null, stock: 20, images: ["https://placehold.co/600x800/8b6914/fff?text=Tui+Da"], categoryId: "cat-tui", category: catMap["cat-tui"] },
+  { id: "p8", name: "Bộ tự thêu hoa cúc", slug: "bo-tu-theu-hoa-cuc", description: "Bộ tự thêu hoa cúc dại tại nhà, bao gồm khung, chỉ, kim và hướng dẫn chi tiết", price: 199000, salePrice: 169000, stock: 60, images: ["https://placehold.co/600x800/EEF1EA/7D8B6A?text=Hoa+Cuc"], categoryId: "cat-diy", category: catMap["cat-diy"] },
+  { id: "p9", name: "Bộ tự thêu hình mèo", slug: "bo-tu-theu-meo", description: "Bộ tự thêu hình mèo dễ thương cho người mới bắt đầu", price: 150000, salePrice: null, stock: 80, images: ["https://placehold.co/600x800/D4DCCA/2C2C2C?text=Hinh+Meo"], categoryId: "cat-diy", category: catMap["cat-diy"] },
+  { id: "p10", name: "Bộ tự thêu chữ nghệ thuật", slug: "bo-tu-theu-chu", description: "Bộ tự thêu câu trích dẫn hoặc tên yêu thích, kích thước 20x20cm", price: 175000, salePrice: 145000, stock: 45, images: ["https://placehold.co/600x800/A8B496/fff?text=Chu+Nghe+Thuat"], categoryId: "cat-diy", category: catMap["cat-diy"] },
 ];
 
 export function getProductBySlug(slug: string): Product | undefined {

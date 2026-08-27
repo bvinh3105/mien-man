@@ -15,24 +15,24 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
   if (!product) notFound();
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm sticky top-0 z-50">
+    <main className="min-h-screen bg-cream">
+      <header className="bg-white/80 backdrop-blur-sm border-b border-sage-100 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold text-gray-900">
+          <Link href="/" className="text-2xl font-display font-semibold text-charcoal tracking-wide">
             Miên Man
           </Link>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-4">
-        <Link href="/" className="text-sm text-blue-600 hover:underline">
+        <Link href="/" className="text-sm text-sage-600 hover:text-sage-800 hover:underline transition">
           &larr; Quay lại
         </Link>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 pb-16">
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden md:flex">
-          <div className="md:w-1/2 aspect-[3/4] bg-gray-100">
+        <div className="bg-white rounded-lg border border-sage-100 overflow-hidden md:flex">
+          <div className="md:w-1/2 aspect-[3/4] bg-sage-50">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={product.images[0]}
@@ -41,31 +41,31 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
             />
           </div>
           <div className="md:w-1/2 p-6 md:p-8">
-            <p className="text-sm text-gray-500 mb-2">{product.category.name}</p>
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">{product.name}</h1>
-            <p className="text-gray-600 mb-6">{product.description}</p>
+            <p className="text-sm text-sage-400 mb-2">{product.category.name}</p>
+            <h1 className="text-2xl font-display font-semibold text-charcoal mb-4">{product.name}</h1>
+            <p className="text-sage-600 mb-6 leading-relaxed">{product.description}</p>
 
             <div className="flex items-center gap-3 mb-6">
-              <span className="text-3xl font-bold text-red-600">
+              <span className="text-3xl font-bold text-sage-700">
                 {formatVND(product.salePrice || product.price)}
               </span>
               {product.salePrice && (
                 <>
-                  <span className="text-lg text-gray-400 line-through">
+                  <span className="text-lg text-sage-300 line-through">
                     {formatVND(product.price)}
                   </span>
-                  <span className="bg-red-100 text-red-600 text-sm px-2 py-1 rounded">
+                  <span className="bg-sage-100 text-sage-700 text-sm px-2 py-1 rounded">
                     -{Math.round((1 - product.salePrice / product.price) * 100)}%
                   </span>
                 </>
               )}
             </div>
 
-            <p className="text-sm text-gray-500 mb-6">
+            <p className="text-sm text-sage-400 mb-6">
               Còn {product.stock} sản phẩm
             </p>
 
-            <button className="w-full py-3 px-6 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+            <button className="w-full py-3 px-6 bg-sage-500 text-white rounded-lg hover:bg-sage-600 transition font-medium">
               Thêm vào giỏ hàng
             </button>
           </div>

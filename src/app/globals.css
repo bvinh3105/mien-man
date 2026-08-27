@@ -2,6 +2,67 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --sage: #7D8B6A;
+  --sage-light: #A8B496;
+  --sage-lighter: #D4DCCA;
+  --sage-pale: #EEF1EA;
+  --cream: #FAF8F5;
+  --charcoal: #2C2C2C;
+  --warm-gray: #6B6560;
+}
+
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "DM Sans", system-ui, -apple-system, sans-serif;
+  background-color: var(--cream);
+  color: var(--charcoal);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Cormorant Garamond", "Georgia", serif;
+}
+
+/* Hero pop-in animation */
+@keyframes mmPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) translateY(20px) rotate(var(--mm-rot, 0deg));
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08) translateY(-4px) rotate(var(--mm-rot, 0deg));
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0) rotate(var(--mm-rot, 0deg));
+  }
+}
+
+@keyframes mmFloat {
+  0%, 100% { transform: translateY(0) rotate(var(--mm-rot, 0deg)); }
+  50% { transform: translateY(-6px) rotate(var(--mm-rot, 0deg)); }
+}
+
+@keyframes mmSpotlight {
+  0%, 100% { opacity: 0; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes mmStitch {
+  from { stroke-dashoffset: 200; }
+  to { stroke-dashoffset: 0; }
+}
+
+.mm-pop {
+  opacity: 0;
+  animation: mmPopIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.mm-float {
+  animation: mmFloat 4s ease-in-out infinite;
+}
+
+.mm-stitch path {
+  stroke-dasharray: 200;
+  animation: mmStitch 2s ease-out forwards;
 }

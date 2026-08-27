@@ -9,8 +9,25 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        sage: {
+          DEFAULT: "#7D8B6A",
+          50: "#EEF1EA",
+          100: "#D4DCCA",
+          200: "#B8C4A8",
+          300: "#A8B496",
+          400: "#94A57E",
+          500: "#7D8B6A",
+          600: "#6A7659",
+          700: "#555F48",
+          800: "#404837",
+          900: "#2B3026",
+        },
+        cream: "#FAF8F5",
+        charcoal: "#2C2C2C",
+      },
+      fontFamily: {
+        display: ['"Cormorant Garamond"', "Georgia", "serif"],
+        body: ['"DM Sans"', "system-ui", "sans-serif"],
       },
     },
   },
