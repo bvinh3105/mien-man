@@ -1,0 +1,12 @@
+name = "mien-man-drive"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+[vars]
+DRIVE_FOLDER_ID = ""           # ID folder Google Drive chính
+ALLOWED_ORIGIN = "http://localhost:3000"  # CORS — đổi khi deploy
+
+# Secrets (set via `wrangler secret put`):
+# GOOGLE_SERVICE_ACCOUNT_EMAIL
+# GOOGLE_PRIVATE_KEY
+# API_SECRET  — token xác thực từ admin panel

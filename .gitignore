@@ -42,3 +42,4 @@ prisma/dev.db-journal
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+workers/drive-api/node_modules/
