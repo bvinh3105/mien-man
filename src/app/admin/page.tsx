@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 // import AdminGuard from '@/components/AdminGuard'; // TODO: bật lại khi deploy
 import {
   DndContext, 
@@ -350,6 +351,16 @@ export default function AdminDashboard() {
             Khách hàng
           </button>
         </nav>
+
+        <div className="p-3 border-t border-gray-100">
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            Về trang Shop
+          </Link>
+        </div>
 
         <div className="p-4 border-t border-gray-100">
           <div className="flex items-center gap-3">
