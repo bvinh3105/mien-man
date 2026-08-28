@@ -5,22 +5,34 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 import { useAuth } from "@/lib/auth";
 
+// ─── Mã nội bộ admin ───────────────────────────
+// Hash đơn giản để không lưu plaintext trong bundle
+async function hashCode(text: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const buffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// SHA-256 hashes (không lưu plaintext)
+const ADMIN_CODE_HASH = "9cdf7c32a063fca110dd74e11b8fd61d0b549d8efc35034f89b21119f7f2bb8b";
+const ADMIN_PASS_HASH = "4c07e3d54c8512a4492504ade13f214c4faaf18f10e4f5f2fee178559fa9eabe";
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/";
-  const { signIn, isAdmin, user, profile } = useAuth();
+  const { signIn, user, profile } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
 
-  // Sau khi đăng nhập thành công, chờ profile load xong → redirect
-  // Admin → /admin, user thường → redirectTo (mặc định /)
+  // Sau khi đăng nhập Supabase thành công, chờ profile → redirect
   useEffect(() => {
     if (!loginSuccess || !user) return;
-    if (!profile) return; // chờ profile fetch xong
+    if (!profile) return;
     if (profile.role === "admin") {
       router.push("/admin");
     } else {
@@ -33,6 +45,21 @@ function LoginForm() {
     setError("");
     setLoading(true);
 
+    // ── Check mã nội bộ admin trước ──
+    const [inputHash, passHash] = await Promise.all([
+      hashCode(email.trim()),
+      hashCode(password),
+    ]);
+
+    if (inputHash === ADMIN_CODE_HASH && passHash === ADMIN_PASS_HASH) {
+      // Mã nội bộ đúng → lưu session flag + vào admin
+      sessionStorage.setItem("mm_admin", "1");
+      setLoading(false);
+      router.push("/admin");
+      return;
+    }
+
+    // ── Nếu không phải mã nội bộ → thử Supabase auth ──
     const { error: err } = await signIn(email, password);
     setLoading(false);
 
@@ -57,8 +84,9 @@ function LoginForm() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-sage-700">Email</label>
-            <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
+            <label htmlFor="email" className="block text-sm font-medium text-sage-700">Tài khoản</label>
+            <input id="email" type="text" value={email} onChange={(e) => setEmail(e.target.value)} required
+              placeholder="Email hoặc mã nội bộ"
               className="mt-1 w-full px-3 py-2 border border-sage-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white" />
           </div>
           <div>
@@ -71,7 +99,7 @@ function LoginForm() {
             disabled={loading}
             className="w-full py-2 px-4 bg-sage-500 text-white rounded-md hover:bg-sage-600 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+            {loading ? "Đang xác thực..." : "Đăng nhập"}
           </button>
         </form>
         <p className="mt-4 text-center text-sm text-sage-500">
