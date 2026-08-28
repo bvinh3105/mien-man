@@ -2,18 +2,31 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useAuth } from "@/lib/auth";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/";
-  const { signIn } = useAuth();
+  const { signIn, isAdmin, user, profile } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
+
+  // Sau khi đăng nhập thành công, chờ profile load xong → redirect
+  // Admin → /admin, user thường → redirectTo (mặc định /)
+  useEffect(() => {
+    if (!loginSuccess || !user) return;
+    if (!profile) return; // chờ profile fetch xong
+    if (profile.role === "admin") {
+      router.push("/admin");
+    } else {
+      router.push(redirectTo);
+    }
+  }, [loginSuccess, user, profile, router, redirectTo]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -26,7 +39,7 @@ function LoginForm() {
     if (err) {
       setError(err);
     } else {
-      router.push(redirectTo);
+      setLoginSuccess(true);
     }
   }
 
