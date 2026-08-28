@@ -73,7 +73,7 @@ export default function GitProgressTracker({ orderId = 'MM-8492', steps = [], co
         {/* Continuous vertical line */}
         <div className="absolute left-[1.25rem] top-2 bottom-2 w-1 bg-gray-200 rounded-full z-0"></div>
 
-        {steps.map((step, index) => {
+        {steps.map((step) => {
           const isPending = step.status === 'empty' || step.status === 'shipping' || step.status === 'delivered';
           const opacityClass = isPending && step.status !== 'delivered' && step.status !== 'shipping' ? 'opacity-50' : '';
           
