@@ -25,6 +25,27 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import GitProgressTracker, { type ProgressStep } from '@/components/GitProgressTracker';
+import {
+  DAILY_REVENUE,
+  MONTHLY_PL,
+  EXPENSE_BREAKDOWN,
+  EXPENSE_ENTRIES,
+  INCOME_ENTRIES,
+  BESTSELLERS,
+  PRODUCT_STATS,
+  STOCK_ALERTS,
+  CUSTOMER_SEGMENTS,
+  TOP_VIP_CUSTOMERS,
+  ACQUISITION_CHANNELS,
+  OVERVIEW_ALERTS,
+  ROLE_META,
+  TEAM_MEMBERS,
+  PERMISSIONS_MATRIX,
+  formatVnd,
+  formatCompact,
+  type RolePermission,
+  type RoleKey,
+} from '@/lib/adminMockData';
 
 // --- HELPER: Tạo steps cho GitProgressTracker dựa trên trạng thái đơn hàng ---
 function buildOrderSteps(order: typeof INITIAL_ORDERS[number]): ProgressStep[] {
@@ -191,6 +212,44 @@ function SortableOrderCard({ order, onClick, isOverlay }: { order: any, onClick?
 }
 
 
+// --- PERMISSION CELL COMPONENT (dùng cho ma trận phân quyền) ---
+function PermissionCell({ value, small = false }: { value: RolePermission; small?: boolean }) {
+  const size = small ? 'w-4 h-4' : 'w-5 h-5';
+  const map: Record<RolePermission, { icon: React.ReactNode; className: string; label: string }> = {
+    full: {
+      icon: <svg className={`${size} text-emerald-600`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>,
+      className: 'bg-emerald-50 border-emerald-200',
+      label: 'Toàn quyền',
+    },
+    read: {
+      icon: <svg className={`${size} text-blue-600`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>,
+      className: 'bg-blue-50 border-blue-200',
+      label: 'Chỉ xem',
+    },
+    own_only: {
+      icon: <svg className={`${size} text-amber-600`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>,
+      className: 'bg-amber-50 border-amber-200',
+      label: 'Chỉ của mình',
+    },
+    masked: {
+      icon: <svg className={`${size} text-purple-600`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path></svg>,
+      className: 'bg-purple-50 border-purple-200',
+      label: 'Ẩn danh',
+    },
+    none: {
+      icon: <svg className={`${size} text-gray-400`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>,
+      className: 'bg-gray-50 border-gray-200',
+      label: 'Không có',
+    },
+  };
+  const m = map[value];
+  return (
+    <div className={`inline-flex items-center justify-center ${small ? 'w-6 h-6' : 'w-8 h-8'} rounded-md border ${m.className}`} title={m.label}>
+      {m.icon}
+    </div>
+  );
+}
+
 // TODO: bật lại AdminGuard khi deploy
 // export default function AdminPage() {
 //   return (
@@ -200,12 +259,16 @@ function SortableOrderCard({ order, onClick, isOverlay }: { order: any, onClick?
 //   );
 // }
 
+type AdminTab = 'overview' | 'orders' | 'products' | 'customers' | 'history' | 'accounting' | 'roles';
+const CURRENT_ROLE: RoleKey = 'owner'; // TODO: lấy từ Supabase session ở Step 2
+
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'customers' | 'history'>('orders');
+  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [orders, setOrders] = useState(INITIAL_ORDERS);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [historyFilter, setHistoryFilter] = useState<'all' | 'delivered' | 'cancelled' | 'refunded'>('all');
   const [showArchiveInfo, setShowArchiveInfo] = useState(false);
+  const [revenueRange, setRevenueRange] = useState<'7' | '30'>('7');
 
   // Modal states
   const [orderModal, setOrderModal] = useState<any>(null);
@@ -318,38 +381,70 @@ export default function AdminDashboard() {
           <h1 className="text-xl font-bold tracking-tight">Miên Man</h1>
         </div>
         
-        <nav className="flex-1 p-4 flex flex-col gap-1">
-          <button 
-            onClick={() => setActiveTab('orders')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === 'orders' ? 'bg-blue-50 text-blue-700 font-bold' : 'font-medium text-gray-600 hover:bg-gray-100'}`}
+        <nav className="flex-1 p-4 flex flex-col gap-1 overflow-y-auto">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === 'overview' ? 'bg-emerald-50 text-emerald-700 font-bold border-l-2 border-emerald-500 -ml-0.5 pl-[10px]' : 'font-medium text-gray-600 hover:bg-gray-100'}`}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-            Đơn hàng
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+            Tổng quan
           </button>
-          <button 
+          <button
+            onClick={() => setActiveTab('orders')}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === 'orders' ? 'bg-emerald-50 text-emerald-700 font-bold border-l-2 border-emerald-500 -ml-0.5 pl-[10px]' : 'font-medium text-gray-600 hover:bg-gray-100'}`}
+          >
+            <span className="flex items-center gap-3">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+              Đơn hàng
+            </span>
+            <span className="text-[10px] font-bold bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">{orders.length}</span>
+          </button>
+          <button
             onClick={() => setActiveTab('products')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === 'products' ? 'bg-blue-50 text-blue-700 font-bold' : 'font-medium text-gray-600 hover:bg-gray-100'}`}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === 'products' ? 'bg-emerald-50 text-emerald-700 font-bold border-l-2 border-emerald-500 -ml-0.5 pl-[10px]' : 'font-medium text-gray-600 hover:bg-gray-100'}`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
             Kho & Sản phẩm
           </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === 'history' ? 'bg-blue-50 text-blue-700 font-bold' : 'font-medium text-gray-600 hover:bg-gray-100'}`}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            Lịch sử đơn
-          </button>
 
-          <div className="border-t border-gray-100 my-2"></div>
+          <div className="pt-4 pb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Khách hàng &amp; Doanh thu</div>
 
           <button
             onClick={() => setActiveTab('customers')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === 'customers' ? 'bg-blue-50 text-blue-700 font-bold' : 'font-medium text-gray-600 hover:bg-gray-100'}`}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === 'customers' ? 'bg-emerald-50 text-emerald-700 font-bold border-l-2 border-emerald-500 -ml-0.5 pl-[10px]' : 'font-medium text-gray-600 hover:bg-gray-100'}`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
             Khách hàng
           </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === 'history' ? 'bg-emerald-50 text-emerald-700 font-bold border-l-2 border-emerald-500 -ml-0.5 pl-[10px]' : 'font-medium text-gray-600 hover:bg-gray-100'}`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Lịch sử đơn
+          </button>
+          {(CURRENT_ROLE === 'owner' || CURRENT_ROLE === 'accountant') && (
+            <button
+              onClick={() => setActiveTab('accounting')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === 'accounting' ? 'bg-emerald-50 text-emerald-700 font-bold border-l-2 border-emerald-500 -ml-0.5 pl-[10px]' : 'font-medium text-gray-600 hover:bg-gray-100'}`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+              Kế toán
+            </button>
+          )}
+
+          {CURRENT_ROLE === 'owner' && (
+            <>
+              <div className="pt-4 pb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Hệ thống</div>
+              <button
+                onClick={() => setActiveTab('roles')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === 'roles' ? 'bg-emerald-50 text-emerald-700 font-bold border-l-2 border-emerald-500 -ml-0.5 pl-[10px]' : 'font-medium text-gray-600 hover:bg-gray-100'}`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                Phân quyền
+              </button>
+            </>
+          )}
         </nav>
 
         <div className="p-3 border-t border-gray-100">
@@ -364,12 +459,12 @@ export default function AdminDashboard() {
 
         <div className="p-4 border-t border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
-              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Admin" alt="Admin" className="w-full h-full object-cover" />
-            </div>
-            <div>
-              <p className="text-sm font-bold">Admin</p>
-              <p className="text-xs text-green-600 font-bold flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 block"></span> Supabase ON</p>
+            <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-lg shrink-0">V</div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-gray-900 truncate">Trần Bảo Vinh</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${ROLE_META[CURRENT_ROLE].badgeClass}`}>{ROLE_META[CURRENT_ROLE].icon} {ROLE_META[CURRENT_ROLE].label}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -380,13 +475,51 @@ export default function AdminDashboard() {
         
         {/* HEADER */}
         <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0 shadow-sm z-10">
-          <h2 className="text-xl font-bold text-gray-800">
-            {activeTab === 'orders' && 'Quản lý Đơn hàng'}
-            {activeTab === 'products' && 'Kho & Sản phẩm'}
-            {activeTab === 'customers' && 'Khách hàng & Liên hệ'}
-            {activeTab === 'history' && 'Lịch sử Đơn hàng'}
-          </h2>
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">
+              {activeTab === 'overview' && 'Chào buổi sáng, xưởng Miên Man 🌿'}
+              {activeTab === 'orders' && 'Quản lý Đơn hàng'}
+              {activeTab === 'products' && 'Kho & Sản phẩm'}
+              {activeTab === 'customers' && 'Khách hàng & Hành vi'}
+              {activeTab === 'history' && 'Lịch sử Đơn hàng'}
+              {activeTab === 'accounting' && 'Kế toán & Tài chính'}
+              {activeTab === 'roles' && 'Phân quyền & Thành viên'}
+            </h2>
+            {activeTab === 'overview' && <p className="text-xs text-gray-500 mt-0.5">Hôm nay Thứ Sáu, 28/08/2026 · Dữ liệu cập nhật lúc 09:42</p>}
+            {activeTab === 'accounting' && <p className="text-xs text-gray-500 mt-0.5">Kỳ báo cáo: Tháng 8/2026 · Chốt sổ ngày 31/08</p>}
+          </div>
           <div className="flex items-center gap-2">
+            {activeTab === 'overview' && (
+              <>
+                <button className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 flex items-center gap-1.5">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                  Xuất báo cáo
+                </button>
+                <button onClick={() => setActiveTab('accounting')} className="bg-emerald-500 text-white px-4 py-2 rounded-md text-sm font-bold hover:bg-emerald-600 flex items-center gap-1.5">
+                  Xem Kế toán
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
+                </button>
+              </>
+            )}
+            {activeTab === 'accounting' && (
+              <>
+                <button className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 flex items-center gap-1.5">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2a2 2 0 012-2h2a2 2 0 012 2v2m-4 0h4m-4 0H8m8 0h1a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v8a2 2 0 002 2h1"/></svg>
+                  Xuất PDF
+                </button>
+                <button className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 flex items-center gap-1.5">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                  Xuất Excel
+                </button>
+                <button className="bg-emerald-500 text-white px-4 py-2 rounded-md text-sm font-bold hover:bg-emerald-600">Đối soát cuối tháng</button>
+              </>
+            )}
+            {activeTab === 'roles' && (
+              <button className="bg-emerald-500 text-white px-4 py-2 rounded-md text-sm font-bold hover:bg-emerald-600 flex items-center gap-1.5">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>
+                Mời thành viên
+              </button>
+            )}
             {activeTab === 'orders' && <button className="bg-gray-900 text-white px-4 py-2 rounded-md text-sm font-bold hover:bg-gray-800">Tạo đơn thủ công</button>}
             {activeTab === 'products' && <button className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-bold hover:bg-blue-700" onClick={() => setProductModal({})}>+ Thêm sản phẩm</button>}
             {activeTab === 'customers' && <button className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-bold hover:bg-gray-50 flex items-center gap-2">Xuất CSV</button>}
@@ -407,7 +540,300 @@ export default function AdminDashboard() {
 
         {/* CONTENT PANELS */}
         <div className="flex-1 overflow-hidden relative">
-          
+
+          {/* ============================ OVERVIEW ============================ */}
+          {activeTab === 'overview' && (() => {
+            const today = DAILY_REVENUE[DAILY_REVENUE.length - 1];
+            const yesterday = DAILY_REVENUE[DAILY_REVENUE.length - 2];
+            const last7 = DAILY_REVENUE.slice(-7);
+            const prev7 = DAILY_REVENUE.slice(-14, -7);
+            const week = last7.reduce((s, d) => s + d.revenue, 0);
+            const prevWeek = prev7.reduce((s, d) => s + d.revenue, 0);
+            const month = DAILY_REVENUE.reduce((s, d) => s + d.revenue, 0);
+            const monthProfit = DAILY_REVENUE.reduce((s, d) => s + d.profit, 0);
+            const deltaToday = ((today.revenue - yesterday.revenue) / yesterday.revenue * 100);
+            const deltaWeek = ((week - prevWeek) / prevWeek * 100);
+            const chartData = revenueRange === '7' ? last7 : DAILY_REVENUE;
+            const chartMax = Math.max(...chartData.map(d => d.revenue));
+
+            return (
+              <div className="h-full overflow-y-auto p-6 bg-gray-50 space-y-6">
+
+                {/* Section A: Doanh thu & Lợi nhuận */}
+                <section>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">💰 Doanh thu &amp; Lợi nhuận</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Doanh thu hôm nay</h4>
+                        <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                      </div>
+                      <p className="text-2xl font-bold text-gray-900">{formatVnd(today.revenue)}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${deltaToday >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                          {deltaToday >= 0 ? '▲' : '▼'} {Math.abs(deltaToday).toFixed(1)}%
+                        </span>
+                        <span className="text-xs text-gray-500">vs hôm qua</span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">{today.orders} đơn · TB {formatVnd(Math.round(today.revenue / today.orders))}</p>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Doanh thu tuần này</h4>
+                        <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                      </div>
+                      <p className="text-2xl font-bold text-gray-900">{formatVnd(week)}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${deltaWeek >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                          {deltaWeek >= 0 ? '▲' : '▼'} {Math.abs(deltaWeek).toFixed(1)}%
+                        </span>
+                        <span className="text-xs text-gray-500">vs tuần trước</span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">{last7.reduce((s, d) => s + d.orders, 0)} đơn hoàn tất</p>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Doanh thu tháng 8</h4>
+                        <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                      </div>
+                      <p className="text-2xl font-bold text-gray-900">{formatVnd(month)}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">▲ 8.0%</span>
+                        <span className="text-xs text-gray-500">vs T7</span>
+                      </div>
+                      <div className="mt-2">
+                        <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
+                          <span>Mục tiêu 120tr</span>
+                          <span className="font-bold text-gray-700">{Math.round(month / 120000000 * 100)}%</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(100, month / 120000000 * 100)}%` }}></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Lợi nhuận gộp</h4>
+                        <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                      </div>
+                      <p className="text-2xl font-bold text-gray-900">{formatVnd(monthProfit)}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">Biên {Math.round(monthProfit / month * 100)}%</span>
+                        <span className="text-xs text-gray-500">▲ +3pp</span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">Vải + chỉ 28.9tr · Nhân công 17.5tr</p>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Section B: Vận hành hôm nay */}
+                <section>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">⚙️ Vận hành hôm nay</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                      <h4 className="text-xs font-medium text-gray-500 mb-1">Đơn đang xử lý</h4>
+                      <p className="text-2xl font-bold text-gray-900">{orders.length} đơn</p>
+                      <div className="mt-3 space-y-1 text-xs text-gray-600">
+                        <div className="flex justify-between"><span>Chờ xử lý</span><span className="font-bold">2</span></div>
+                        <div className="flex justify-between"><span>Đang sản xuất</span><span className="font-bold text-blue-600">1</span></div>
+                        <div className="flex justify-between"><span>Tạm dừng</span><span className="font-bold text-purple-600">1</span></div>
+                      </div>
+                      <button onClick={() => setActiveTab('orders')} className="mt-3 text-xs text-emerald-600 font-bold hover:underline">Xem Kanban →</button>
+                    </div>
+
+                    <div className="bg-red-50 p-5 rounded-xl border border-red-200 shadow-sm">
+                      <h4 className="text-xs font-medium text-red-600 mb-1">⚠ Cần chú ý</h4>
+                      <p className="text-2xl font-bold text-red-700">1 đơn</p>
+                      <p className="text-xs text-red-600 mt-2">MM-0040 · Bảo Trần</p>
+                      <p className="text-xs text-red-500 mt-0.5">Tạm dừng — hết chỉ đỏ #42R</p>
+                      <button onClick={() => setActiveTab('orders')} className="mt-3 bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-md w-full">Xử lý ngay →</button>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                      <h4 className="text-xs font-medium text-gray-500 mb-1">Hoàn thành hôm nay</h4>
+                      <p className="text-2xl font-bold text-emerald-600">3 đơn</p>
+                      <div className="mt-3 space-y-1 text-xs text-gray-600">
+                        <div className="flex justify-between"><span>Đã giao</span><span className="font-bold">2</span></div>
+                        <div className="flex justify-between"><span>Sẵn sàng giao</span><span className="font-bold">1</span></div>
+                      </div>
+                      <p className="text-xs text-emerald-600 font-bold mt-2">+ {formatVnd(today.revenue)} ghi nhận</p>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                      <h4 className="text-xs font-medium text-gray-500 mb-1">Đúng hạn 30 ngày</h4>
+                      <p className="text-2xl font-bold text-gray-900">92%</p>
+                      <div className="mt-2">
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500 rounded-full" style={{ width: '92%' }}></div>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">46/50 đơn · Mục tiêu 95%</p>
+                      <p className="text-xs font-bold text-emerald-600 mt-1">▲ +4pp vs tháng trước</p>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Section C: Biểu đồ doanh thu */}
+                <section>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h4 className="text-sm font-bold text-gray-800">📈 Biểu đồ doanh thu</h4>
+                          <p className="text-xs text-gray-500 mt-0.5">Trung bình {formatVnd(Math.round(chartData.reduce((s, d) => s + d.revenue, 0) / chartData.length))}/ngày</p>
+                        </div>
+                        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+                          <button onClick={() => setRevenueRange('7')} className={`px-3 py-1 rounded-md text-xs font-bold transition-colors ${revenueRange === '7' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>7 ngày</button>
+                          <button onClick={() => setRevenueRange('30')} className={`px-3 py-1 rounded-md text-xs font-bold transition-colors ${revenueRange === '30' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>30 ngày</button>
+                        </div>
+                      </div>
+                      {/* Pure CSS/SVG bar chart */}
+                      <div className="flex items-end gap-1 h-40 mt-4">
+                        {chartData.map((d, i) => (
+                          <div key={i} className="flex-1 flex flex-col items-center group relative">
+                            <div className="w-full flex flex-col items-center justify-end h-full">
+                              <div
+                                className="w-full bg-emerald-500 rounded-t-sm hover:bg-emerald-600 transition-colors cursor-pointer relative"
+                                style={{ height: `${(d.revenue / chartMax) * 100}%` }}
+                                title={`${d.date}: ${formatVnd(d.revenue)} (${d.orders} đơn)`}
+                              >
+                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded whitespace-nowrap transition-opacity pointer-events-none z-10">
+                                  {formatCompact(d.revenue)}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-2 font-mono">
+                        {chartData.filter((_, i) => i % Math.ceil(chartData.length / 7) === 0).map(d => (
+                          <span key={d.date}>{d.date}</span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                      <h4 className="text-sm font-bold text-gray-800 mb-4">📊 Tóm tắt 30 ngày</h4>
+                      <div className="space-y-4">
+                        <div>
+                          <div className="flex justify-between items-baseline">
+                            <span className="text-xs text-gray-500">Tổng doanh thu</span>
+                            <span className="text-xs font-bold text-emerald-600">+8% ▲</span>
+                          </div>
+                          <p className="text-lg font-bold text-gray-900">{formatVnd(month)}</p>
+                        </div>
+                        <div>
+                          <div className="flex justify-between items-baseline">
+                            <span className="text-xs text-gray-500">Số đơn hoàn tất</span>
+                            <span className="text-xs font-bold text-emerald-600">+11% ▲</span>
+                          </div>
+                          <p className="text-lg font-bold text-gray-900">{DAILY_REVENUE.reduce((s, d) => s + d.orders, 0)} đơn</p>
+                        </div>
+                        <div>
+                          <div className="flex justify-between items-baseline">
+                            <span className="text-xs text-gray-500">AOV (giá trị TB)</span>
+                            <span className="text-xs font-bold text-red-600">-2.7% ▼</span>
+                          </div>
+                          <p className="text-lg font-bold text-gray-900">{formatVnd(Math.round(month / DAILY_REVENUE.reduce((s, d) => s + d.orders, 0)))}</p>
+                        </div>
+                        <div>
+                          <div className="flex justify-between items-baseline">
+                            <span className="text-xs text-gray-500">Khách mới</span>
+                            <span className="text-xs font-bold text-emerald-600">+22% ▲</span>
+                          </div>
+                          <p className="text-lg font-bold text-gray-900">34 người</p>
+                        </div>
+                        <button onClick={() => setActiveTab('history')} className="w-full text-xs text-emerald-600 font-bold hover:underline pt-2 border-t border-gray-100">Xem Lịch sử chi tiết →</button>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Section D: Top 3 bestsellers */}
+                <section>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">🔥 Top 3 sản phẩm bán chạy tuần này</h3>
+                    <button onClick={() => setActiveTab('products')} className="text-xs text-emerald-600 font-bold hover:underline">Xem tất cả →</button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {BESTSELLERS.map(b => (
+                      <div key={b.rank} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex gap-3">
+                        <div className={`w-16 h-16 rounded-lg flex-shrink-0 flex items-center justify-center text-2xl font-bold ${b.rank === 1 ? 'bg-yellow-100 text-yellow-700' : b.rank === 2 ? 'bg-gray-100 text-gray-700' : 'bg-amber-100 text-amber-800'}`}>
+                          #{b.rank}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-bold text-gray-900 truncate">{b.name}</h4>
+                          <p className="text-xs text-gray-500 mt-0.5">{b.orders} đơn · {formatVnd(b.revenue)}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${b.trend === 'up' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                              {b.trend === 'up' ? '▲' : '▼'} {Math.abs(b.deltaPct)}%
+                            </span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${b.stock < 10 ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                              Còn {b.stock} {b.stockUnit}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                {/* Section E: Alerts + Quick actions */}
+                <section>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                      <h4 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                        Cảnh báo cần chú ý ({OVERVIEW_ALERTS.length})
+                      </h4>
+                      <div className="space-y-2">
+                        {OVERVIEW_ALERTS.map((a, i) => (
+                          <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${a.level === 'danger' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+                            <span className="text-lg">{a.icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-gray-800">{a.msg}</p>
+                              <button onClick={() => setActiveTab(a.link as AdminTab)} className={`text-xs font-bold mt-1 hover:underline ${a.level === 'danger' ? 'text-red-700' : 'text-amber-700'}`}>{a.cta} →</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                      <h4 className="text-sm font-bold text-gray-800 mb-4">🚀 Truy cập nhanh</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button onClick={() => setActiveTab('orders')} className="p-4 bg-gray-50 hover:bg-emerald-50 hover:border-emerald-300 border border-gray-200 rounded-lg text-left transition-all group">
+                          <svg className="w-6 h-6 text-gray-600 group-hover:text-emerald-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                          <p className="text-sm font-bold text-gray-900">Kanban đơn hàng</p>
+                          <p className="text-xs text-gray-500 mt-0.5">Kéo thả trạng thái đơn</p>
+                        </button>
+                        <button onClick={() => setActiveTab('customers')} className="p-4 bg-gray-50 hover:bg-emerald-50 hover:border-emerald-300 border border-gray-200 rounded-lg text-left transition-all group">
+                          <svg className="w-6 h-6 text-gray-600 group-hover:text-emerald-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                          <p className="text-sm font-bold text-gray-900">Khách VIP</p>
+                          <p className="text-xs text-gray-500 mt-0.5">108 KH · 187.5tr đóng góp</p>
+                        </button>
+                        <button onClick={() => setActiveTab('products')} className="p-4 bg-gray-50 hover:bg-emerald-50 hover:border-emerald-300 border border-gray-200 rounded-lg text-left transition-all group">
+                          <svg className="w-6 h-6 text-gray-600 group-hover:text-emerald-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                          <p className="text-sm font-bold text-gray-900">Kho &amp; Bestsellers</p>
+                          <p className="text-xs text-gray-500 mt-0.5">24 SKU · 3 cảnh báo</p>
+                        </button>
+                        <button onClick={() => setActiveTab('accounting')} className="p-4 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg text-left transition-all group">
+                          <svg className="w-6 h-6 text-emerald-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                          <p className="text-sm font-bold text-emerald-700">Sổ sách kế toán</p>
+                          <p className="text-xs text-emerald-600 mt-0.5">P&amp;L · Cash flow · Công nợ</p>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+              </div>
+            );
+          })()}
+
           {/* ORDERS KANBAN */}
           {activeTab === 'orders' && (
             <DndContext 
@@ -457,13 +883,103 @@ export default function AdminDashboard() {
 
           {/* PRODUCTS VIEW */}
           {activeTab === 'products' && (
-            <div className="h-full overflow-y-auto p-6 bg-gray-50">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm"><h3 className="text-sm font-medium text-gray-500 mb-1">Tổng Sản Phẩm</h3><p className="text-2xl font-bold text-gray-900">42</p></div>
+            <div className="h-full overflow-y-auto p-6 bg-gray-50 space-y-6">
+
+              {/* Quick metrics */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">Cảnh Báo Kho</h3>
-                  <div className="flex items-center gap-2"><p className="text-2xl font-bold text-red-600">3</p><span className="text-xs font-medium bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Sắp hết</span></div>
+                  <h3 className="text-xs font-medium text-gray-500 uppercase mb-1">Doanh thu SP tháng</h3>
+                  <p className="text-2xl font-bold text-emerald-600">{formatVnd(PRODUCT_STATS.reduce((s, p) => s + p.revenue, 0))}</p>
                 </div>
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                  <h3 className="text-xs font-medium text-gray-500 uppercase mb-1">SKU đang bán</h3>
+                  <p className="text-2xl font-bold text-gray-900">{PRODUCT_STATS.length}</p>
+                </div>
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                  <h3 className="text-xs font-medium text-gray-500 uppercase mb-1">Margin trung bình</h3>
+                  <p className="text-2xl font-bold text-gray-900">{Math.round(PRODUCT_STATS.reduce((s, p) => s + p.marginPct, 0) / PRODUCT_STATS.length)}%</p>
+                </div>
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                  <h3 className="text-xs font-medium text-gray-500 uppercase mb-1">Cảnh báo kho</h3>
+                  <div className="flex items-center gap-2"><p className="text-2xl font-bold text-red-600">{STOCK_ALERTS.length}</p><span className="text-xs font-medium bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Sắp hết</span></div>
+                </div>
+              </div>
+
+              {/* Bestsellers Table (enhanced) */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-800">🏆 Top sản phẩm bán chạy 30 ngày</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">Sắp xếp theo doanh thu</p>
+                  </div>
+                  <button className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded-md">+ Chạy khuyến mãi</button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500">
+                      <tr>
+                        <th className="text-left p-3 font-bold">#</th>
+                        <th className="text-left p-3 font-bold">Sản phẩm</th>
+                        <th className="text-right p-3 font-bold">Đơn</th>
+                        <th className="text-right p-3 font-bold">Doanh thu</th>
+                        <th className="text-right p-3 font-bold">Margin</th>
+                        <th className="text-right p-3 font-bold">Hủy</th>
+                        <th className="text-right p-3 font-bold">Xu hướng</th>
+                        <th className="text-center p-3 font-bold">Tồn kho</th>
+                        <th className="text-center p-3 font-bold">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {PRODUCT_STATS.map((p, i) => (
+                        <tr key={p.sku} className="hover:bg-gray-50">
+                          <td className="p-3 font-bold text-gray-500">{i + 1}</td>
+                          <td className="p-3">
+                            <p className="font-bold text-gray-900">{p.name}</p>
+                            <p className="text-xs text-gray-500 font-mono">{p.sku}</p>
+                          </td>
+                          <td className="p-3 text-right font-bold">{p.orders}</td>
+                          <td className="p-3 text-right font-bold text-emerald-600">{formatVnd(p.revenue)}</td>
+                          <td className="p-3 text-right"><span className={`text-xs font-bold px-2 py-0.5 rounded ${p.marginPct >= 60 ? 'bg-emerald-50 text-emerald-700' : p.marginPct >= 50 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>{p.marginPct}%</span></td>
+                          <td className="p-3 text-right text-xs text-gray-500">{p.cancelRate}%</td>
+                          <td className="p-3 text-right"><span className={`text-xs font-bold ${p.trendPct > 0 ? 'text-emerald-600' : p.trendPct < 0 ? 'text-red-600' : 'text-gray-500'}`}>{p.trendPct > 0 ? '▲' : p.trendPct < 0 ? '▼' : '→'} {Math.abs(p.trendPct)}%</span></td>
+                          <td className="p-3 text-center">
+                            {p.stock <= p.threshold ? <span className="text-xs font-bold text-red-600">⚠ {p.stock}</span> : <span className="text-xs font-bold text-emerald-600">{p.stock}</span>}
+                          </td>
+                          <td className="p-3 text-center">
+                            <div className="flex gap-1 justify-center">
+                              <button className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-2 py-1 rounded hover:bg-emerald-200">Push</button>
+                              <button className="text-[10px] bg-red-100 text-red-700 font-bold px-2 py-1 rounded hover:bg-red-200">Sale</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Stock alerts */}
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">⚠ Cảnh báo tồn kho ({STOCK_ALERTS.length})</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {STOCK_ALERTS.map((a, i) => (
+                    <div key={i} className={`p-4 rounded-xl border ${a.severity === 'danger' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className={`text-sm font-bold ${a.severity === 'danger' ? 'text-red-800' : 'text-amber-800'}`}>{a.name}</h4>
+                        <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${a.severity === 'danger' ? 'bg-red-200 text-red-800' : 'bg-amber-200 text-amber-800'}`}>{a.severity === 'danger' ? 'Nguy cấp' : 'Cảnh báo'}</span>
+                      </div>
+                      <p className={`text-lg font-bold ${a.severity === 'danger' ? 'text-red-700' : 'text-amber-700'}`}>Còn {a.current} {a.unit}</p>
+                      <p className={`text-xs mt-1 ${a.severity === 'danger' ? 'text-red-600' : 'text-amber-600'}`}>Ngưỡng: {a.threshold} {a.unit}</p>
+                      <p className={`text-xs mt-2 italic ${a.severity === 'danger' ? 'text-red-700' : 'text-amber-700'}`}>{a.note}</p>
+                      <button className={`mt-3 w-full text-xs font-bold py-1.5 rounded-md ${a.severity === 'danger' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-amber-500 hover:bg-amber-600 text-white'}`}>Đặt bổ sung →</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Existing product mgmt cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm"><h3 className="text-sm font-medium text-gray-500 mb-1">Sản phẩm demo (MOCK_PRODUCTS)</h3><p className="text-2xl font-bold text-gray-900">{MOCK_PRODUCTS.length}</p></div>
               </div>
               
               <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -514,8 +1030,141 @@ export default function AdminDashboard() {
 
           {/* CUSTOMERS VIEW */}
           {activeTab === 'customers' && (
-            <div className="h-full overflow-y-auto p-6 bg-gray-50">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div className="h-full overflow-y-auto p-6 bg-gray-50 space-y-6">
+
+              {/* RFM Segmentation */}
+              <section>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">🎯 Phân khúc khách hàng (RFM)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {CUSTOMER_SEGMENTS.map(seg => {
+                    const bgMap: Record<string, string> = { brand: 'bg-emerald-50 border-emerald-200 text-emerald-700', blue: 'bg-blue-50 border-blue-200 text-blue-700', amber: 'bg-amber-50 border-amber-200 text-amber-700', red: 'bg-red-50 border-red-200 text-red-700' };
+                    const cls = bgMap[seg.color];
+                    return (
+                      <div key={seg.key} className={`p-5 rounded-xl border ${cls}`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="text-sm font-bold">{seg.label}</h4>
+                          <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-white/60">{seg.pct}%</span>
+                        </div>
+                        <p className="text-3xl font-bold mt-1">{seg.count}</p>
+                        <p className="text-xs opacity-80 mt-1">{seg.desc}</p>
+                        <div className="mt-3 pt-3 border-t border-current/20">
+                          <p className="text-[10px] uppercase font-bold opacity-70">Đóng góp DT</p>
+                          <p className="text-sm font-bold">{formatCompact(seg.revenueContribution)} · LTV {formatCompact(seg.avgLtv)}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {/* 3 KPI cards */}
+              <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                  <h4 className="text-xs font-medium text-gray-500 uppercase">LTV trung bình</h4>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{formatVnd(1850000)}</p>
+                  <p className="text-xs text-emerald-600 font-bold mt-1">▲ +12% so với Q2</p>
+                </div>
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                  <h4 className="text-xs font-medium text-gray-500 uppercase">Tỷ lệ mua lại</h4>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">38%</p>
+                  <p className="text-xs text-emerald-600 font-bold mt-1">▲ +4pp vs tháng trước</p>
+                </div>
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                  <h4 className="text-xs font-medium text-gray-500 uppercase">AOV (giá trị/đơn)</h4>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{formatVnd(820000)}</p>
+                  <p className="text-xs text-red-600 font-bold mt-1">▼ -3% cần chú ý</p>
+                </div>
+              </section>
+
+              {/* Top VIP + Acquisition */}
+              <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                  <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-gray-800">👑 Top 5 khách hàng VIP</h4>
+                    <button className="text-xs text-emerald-600 font-bold hover:underline">Gửi voucher VIP →</button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                        <tr>
+                          <th className="text-left p-3 font-bold">#</th>
+                          <th className="text-left p-3 font-bold">Khách hàng</th>
+                          <th className="text-right p-3 font-bold">Số đơn</th>
+                          <th className="text-right p-3 font-bold">Chi tiêu</th>
+                          <th className="text-right p-3 font-bold">Đơn gần nhất</th>
+                          <th className="text-left p-3 font-bold">Thích</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {TOP_VIP_CUSTOMERS.map(c => (
+                          <tr key={c.rank} className="hover:bg-gray-50">
+                            <td className="p-3 font-bold text-gray-500">#{c.rank}</td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold ${c.color}`}>{c.avatar}</div>
+                                <div>
+                                  <p className="font-bold text-gray-900">{c.name}</p>
+                                  <p className="text-xs text-gray-500 font-mono">{c.phone}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-3 text-right font-bold">{c.orders}</td>
+                            <td className="p-3 text-right font-bold text-emerald-600">{formatVnd(c.spent)}</td>
+                            <td className="p-3 text-right text-xs text-gray-500">{c.lastDays} ngày trước</td>
+                            <td className="p-3 text-xs text-gray-700">{c.favorite}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                  <h4 className="text-sm font-bold text-gray-800 mb-4">📱 Kênh acquisition</h4>
+                  <div className="space-y-3">
+                    {ACQUISITION_CHANNELS.map(ch => (
+                      <div key={ch.channel}>
+                        <div className="flex items-center justify-between mb-1 text-xs">
+                          <span className="font-medium text-gray-700">{ch.channel}</span>
+                          <span className="font-bold text-gray-900">{ch.count} · {ch.pct}%</span>
+                        </div>
+                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full ${ch.color}`} style={{ width: `${ch.pct}%` }}></div>
+                        </div>
+                        {ch.costPer > 0 && <p className="text-[10px] text-gray-400 mt-1">CAC: {formatVnd(ch.costPer)}/khách</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              {/* CTA Marketing */}
+              <section>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">📣 Campaign gợi ý</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-xl p-5">
+                    <div className="text-2xl mb-2">🎁</div>
+                    <h4 className="text-sm font-bold text-emerald-900">Gửi voucher VIP</h4>
+                    <p className="text-xs text-emerald-700 mt-1">108 khách VIP đóng góp 68% doanh thu. Tặng voucher 15% giữ chân.</p>
+                    <button className="mt-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-lg">Chạy campaign →</button>
+                  </div>
+                  <div className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-xl p-5">
+                    <div className="text-2xl mb-2">💔</div>
+                    <h4 className="text-sm font-bold text-red-900">Win-back sắp mất</h4>
+                    <p className="text-xs text-red-700 mt-1">378 khách không mua &gt;90 ngày. Tiềm năng mất 45.6tr doanh thu.</p>
+                    <button className="mt-3 w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2 rounded-lg">Retention email →</button>
+                  </div>
+                  <div className="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-xl p-5">
+                    <div className="text-2xl mb-2">🌱</div>
+                    <h4 className="text-sm font-bold text-amber-900">Nurture khách mới</h4>
+                    <p className="text-xs text-amber-700 mt-1">512 khách mới trong 30 ngày. Onboarding + gợi ý sản phẩm liên quan.</p>
+                    <button className="mt-3 w-full bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold py-2 rounded-lg">Setup autoflow →</button>
+                  </div>
+                </div>
+              </section>
+
+              {/* Bảng KH hiện tại */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm"><h3 className="text-sm font-medium text-gray-500 mb-1">Tổng Khách Hàng</h3><p className="text-2xl font-bold text-gray-900">1,248</p></div>
                 <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm"><h3 className="text-sm font-medium text-gray-500 mb-1">Khách Mới (Tuần)</h3><p className="text-2xl font-bold text-green-600">+42</p></div>
                 <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm"><h3 className="text-sm font-medium text-gray-500 mb-1">Thành viên VIP</h3><p className="text-2xl font-bold text-yellow-600">15</p></div>
@@ -748,6 +1397,381 @@ export default function AdminDashboard() {
               </div>
             );
           })()}
+
+          {/* ============================ ACCOUNTING ============================ */}
+          {activeTab === 'accounting' && (() => {
+            const totalRevenue = INCOME_ENTRIES.reduce((s, e) => s + e.amount, 0);
+            const collected = INCOME_ENTRIES.filter(e => e.collected).reduce((s, e) => s + e.amount, 0);
+            const pending = totalRevenue - collected;
+            const totalExpense = EXPENSE_ENTRIES.reduce((s, e) => s + e.amount, 0);
+            const netProfit = totalRevenue - totalExpense;
+            const monthlyMax = Math.max(...MONTHLY_PL.map(m => m.revenue));
+
+            return (
+              <div className="h-full overflow-y-auto p-6 bg-gray-50 space-y-6">
+
+                {/* KPI cards */}
+                <section>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-emerald-500">
+                      <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Doanh thu</h4>
+                      <p className="text-2xl font-bold text-emerald-600 mt-1">{formatVnd(totalRevenue)}</p>
+                      <div className="mt-2 space-y-0.5 text-xs">
+                        <div className="flex justify-between"><span className="text-gray-500">Đã thu</span><span className="font-bold text-emerald-700">{formatVnd(collected)}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">Chờ thu</span><span className="font-bold text-amber-600">{formatVnd(pending)}</span></div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-red-500">
+                      <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Chi phí</h4>
+                      <p className="text-2xl font-bold text-red-600 mt-1">{formatVnd(totalExpense)}</p>
+                      <div className="mt-2 space-y-0.5 text-xs">
+                        {EXPENSE_BREAKDOWN.map(e => (
+                          <div key={e.category} className="flex justify-between"><span className="text-gray-500 truncate">{e.label.split(' ')[0]}</span><span className="font-bold text-gray-700">{formatCompact(e.amount)}</span></div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-emerald-600">
+                      <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Lợi nhuận ròng</h4>
+                      <p className="text-2xl font-bold text-gray-900 mt-1">{formatVnd(netProfit)}</p>
+                      <div className="mt-2">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-gray-500">Biên lợi nhuận</span>
+                          <span className="font-bold text-emerald-600">{Math.round(netProfit / totalRevenue * 100)}%</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500" style={{ width: `${netProfit / totalRevenue * 100}%` }}></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-blue-500">
+                      <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Tiền mặt</h4>
+                      <p className="text-2xl font-bold text-blue-600 mt-1">{formatVnd(8920000)}</p>
+                      <div className="mt-2 space-y-0.5 text-xs">
+                        <div className="flex justify-between"><span className="text-gray-500">Đầu kỳ</span><span className="font-mono">{formatVnd(7450000)}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">Biến động</span><span className="font-bold text-emerald-600">+{formatCompact(1470000)}</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Sổ thu + Sổ chi */}
+                <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Sổ thu */}
+                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-bold text-gray-800">📥 Sổ thu — Doanh thu</h4>
+                        <p className="text-xs text-gray-500 mt-0.5">{INCOME_ENTRIES.length} giao dịch tháng 8</p>
+                      </div>
+                      <button className="text-xs text-emerald-600 font-bold hover:underline">Xem tất cả →</button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 text-gray-500 uppercase text-[10px]">
+                          <tr>
+                            <th className="text-left p-3 font-bold">Ngày</th>
+                            <th className="text-left p-3 font-bold">Mã đơn</th>
+                            <th className="text-left p-3 font-bold">Khách</th>
+                            <th className="text-right p-3 font-bold">Số tiền</th>
+                            <th className="text-center p-3 font-bold">TT</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {INCOME_ENTRIES.map(e => (
+                            <tr key={e.orderId} className="hover:bg-gray-50">
+                              <td className="p-3 font-mono text-gray-500">{e.date}</td>
+                              <td className="p-3 font-mono font-bold">{e.orderId}</td>
+                              <td className="p-3 text-gray-700">{e.customer}</td>
+                              <td className="p-3 text-right font-bold text-emerald-600">{formatVnd(e.amount)}</td>
+                              <td className="p-3 text-center">
+                                {e.collected ? <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded">Đã thu</span> : <span className="text-[10px] bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded">Chờ</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Sổ chi */}
+                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-bold text-gray-800">📤 Sổ chi — Phân loại</h4>
+                        <p className="text-xs text-gray-500 mt-0.5">{EXPENSE_ENTRIES.length} phiếu chi tháng 8</p>
+                      </div>
+                      <button className="text-xs text-emerald-600 font-bold hover:underline">+ Thêm phiếu chi</button>
+                    </div>
+                    {/* Breakdown bar */}
+                    <div className="p-5 border-b border-gray-100">
+                      <div className="flex h-6 rounded-lg overflow-hidden mb-3">
+                        {EXPENSE_BREAKDOWN.map(e => (
+                          <div key={e.category} className={`${e.color} flex items-center justify-center text-white text-[10px] font-bold`} style={{ width: `${e.pct}%` }} title={`${e.label}: ${formatVnd(e.amount)}`}>
+                            {e.pct}%
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-3 text-xs">
+                        {EXPENSE_BREAKDOWN.map(e => (
+                          <div key={e.category} className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${e.color}`}></span>
+                            <span className="text-gray-600">{e.label}</span>
+                            <span className="font-bold text-gray-900">{formatCompact(e.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto max-h-72">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 text-gray-500 uppercase text-[10px] sticky top-0">
+                          <tr>
+                            <th className="text-left p-3 font-bold">Ngày</th>
+                            <th className="text-left p-3 font-bold">Loại</th>
+                            <th className="text-left p-3 font-bold">Mô tả</th>
+                            <th className="text-right p-3 font-bold">Số tiền</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {EXPENSE_ENTRIES.map((e, i) => (
+                            <tr key={i} className="hover:bg-gray-50">
+                              <td className="p-3 font-mono text-gray-500">{e.date}</td>
+                              <td className="p-3"><span className="text-[10px] bg-gray-100 text-gray-700 font-bold px-1.5 py-0.5 rounded">{e.category}</span></td>
+                              <td className="p-3 text-gray-700">{e.desc}</td>
+                              <td className="p-3 text-right font-bold text-red-600">-{formatVnd(e.amount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </section>
+
+                {/* P&L 6 tháng chart */}
+                <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-800">📈 Báo cáo Lãi/Lỗ 6 tháng gần nhất</h4>
+                      <p className="text-xs text-gray-500 mt-0.5">Biên lợi nhuận trung bình: {(MONTHLY_PL.reduce((s, m) => s + m.margin, 0) / MONTHLY_PL.length).toFixed(1)}%</p>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs">
+                      <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-500"></span>Doanh thu</div>
+                      <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-400"></span>Chi phí</div>
+                      <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-gray-800"></span>Lợi nhuận</div>
+                    </div>
+                  </div>
+                  <div className="flex items-end gap-4 h-56">
+                    {MONTHLY_PL.map(m => (
+                      <div key={m.month} className="flex-1 flex flex-col items-center">
+                        <div className="w-full flex items-end justify-center gap-1 h-48">
+                          <div className="w-1/3 bg-emerald-500 hover:bg-emerald-600 rounded-t transition-colors relative group" style={{ height: `${(m.revenue / monthlyMax) * 100}%` }}>
+                            <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-bold text-emerald-700 whitespace-nowrap">{formatCompact(m.revenue)}</span>
+                          </div>
+                          <div className="w-1/3 bg-red-400 hover:bg-red-500 rounded-t transition-colors" style={{ height: `${(m.cost / monthlyMax) * 100}%` }}></div>
+                          <div className="w-1/3 bg-gray-800 rounded-t" style={{ height: `${(m.profit / monthlyMax) * 100}%` }}></div>
+                        </div>
+                        <p className="text-xs font-bold text-gray-600 mt-2">{m.month}</p>
+                        <p className="text-[10px] text-gray-400">Biên {m.margin.toFixed(0)}%</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                {/* Công nợ */}
+                <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-amber-50 rounded-xl border border-amber-200 p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-bold text-amber-800 flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/></svg>
+                        Phải thu (COD chờ)
+                      </h4>
+                      <span className="text-lg font-bold text-amber-700">{formatVnd(pending)}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {INCOME_ENTRIES.filter(e => !e.collected).map(e => (
+                        <div key={e.orderId} className="bg-white/70 p-2 rounded-lg flex items-center justify-between text-xs">
+                          <span><strong className="font-mono">{e.orderId}</strong> · {e.customer}</span>
+                          <span className="font-bold text-amber-700">{formatVnd(e.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 rounded-xl border border-blue-200 p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-bold text-blue-800 flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                        Phải trả (đến hạn)
+                      </h4>
+                      <span className="text-lg font-bold text-blue-700">{formatVnd(11300000)}</span>
+                    </div>
+                    <div className="space-y-2 text-xs">
+                      <div className="bg-white/70 p-2 rounded-lg flex items-center justify-between">
+                        <span>Cô Lan · Lương kỳ 2 (T8)</span>
+                        <span className="font-bold text-blue-700">{formatVnd(4500000)}</span>
+                      </div>
+                      <div className="bg-white/70 p-2 rounded-lg flex items-center justify-between">
+                        <span>Anh Đức + Chị Mai · Lương kỳ 2</span>
+                        <span className="font-bold text-blue-700">{formatVnd(6800000)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+              </div>
+            );
+          })()}
+
+          {/* ============================ ROLES / PERMISSIONS ============================ */}
+          {activeTab === 'roles' && (
+            <div className="h-full overflow-y-auto p-6 bg-gray-50 space-y-6">
+
+              {/* 4 Role Cards */}
+              <section>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">👥 4 Vai trò trong hệ thống</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {(Object.entries(ROLE_META) as [RoleKey, typeof ROLE_META[RoleKey]][]).map(([key, meta]) => {
+                    const members = TEAM_MEMBERS.filter(m => m.role === key);
+                    return (
+                      <div key={key} className={`p-5 rounded-xl border-2 ${meta.badgeClass.replace('/10', '/5').replace('text-', 'border-')}`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-2xl">{meta.icon}</span>
+                          <h4 className="text-base font-bold text-gray-900">{meta.label}</h4>
+                        </div>
+                        <p className="text-xs text-gray-600 leading-relaxed mb-3">{meta.description}</p>
+                        <div className="pt-3 border-t border-gray-200">
+                          <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wide">Thành viên</p>
+                          <p className="text-lg font-bold text-gray-900 mt-1">{members.length} người</p>
+                          <div className="mt-1 space-y-0.5">
+                            {members.map(m => (
+                              <p key={m.id} className="text-xs text-gray-600 truncate">
+                                {m.status === 'invited' && '⏳ '}{m.name}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {/* Ma trận permissions */}
+              <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-800">🔐 Ma trận quyền chi tiết</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">Tất cả tính năng theo từng role</p>
+                  </div>
+                  <button className="text-xs bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-md hover:bg-emerald-600">Sửa quyền hàng loạt</button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 border-b border-gray-100">
+                      <tr>
+                        <th className="text-left p-3 font-bold text-gray-500 uppercase text-[10px] w-64">Chức năng</th>
+                        {(Object.keys(ROLE_META) as RoleKey[]).map(r => (
+                          <th key={r} className="text-center p-3 font-bold text-gray-500 uppercase text-[10px]">
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="text-base">{ROLE_META[r].icon}</span>
+                              <span>{ROLE_META[r].label}</span>
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {PERMISSIONS_MATRIX.map((cat) => (
+                        <React.Fragment key={cat.category}>
+                          <tr className="bg-gray-50/50">
+                            <td colSpan={5} className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">{cat.category}</td>
+                          </tr>
+                          {cat.permissions.map(perm => (
+                            <tr key={perm.key} className="border-t border-gray-100 hover:bg-gray-50">
+                              <td className="p-3 text-gray-700 font-medium">{perm.label}</td>
+                              {(['owner', 'manager', 'staff', 'accountant'] as RoleKey[]).map(role => {
+                                const val: RolePermission = perm[role];
+                                return (
+                                  <td key={role} className="p-3 text-center">
+                                    <PermissionCell value={val} />
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Legend */}
+                <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex flex-wrap gap-4 text-xs">
+                  <div className="flex items-center gap-1.5"><PermissionCell value="full" small /> <span className="text-gray-600">Toàn quyền</span></div>
+                  <div className="flex items-center gap-1.5"><PermissionCell value="read" small /> <span className="text-gray-600">Chỉ xem</span></div>
+                  <div className="flex items-center gap-1.5"><PermissionCell value="own_only" small /> <span className="text-gray-600">Chỉ của mình</span></div>
+                  <div className="flex items-center gap-1.5"><PermissionCell value="masked" small /> <span className="text-gray-600">Ẩn danh</span></div>
+                  <div className="flex items-center gap-1.5"><PermissionCell value="none" small /> <span className="text-gray-600">Không có</span></div>
+                </div>
+              </section>
+
+              {/* Danh sách thành viên */}
+              <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-gray-100">
+                  <h4 className="text-sm font-bold text-gray-800">👤 Danh sách thành viên ({TEAM_MEMBERS.length})</h4>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                      <tr>
+                        <th className="text-left p-3 font-bold">Thành viên</th>
+                        <th className="text-left p-3 font-bold">Role</th>
+                        <th className="text-left p-3 font-bold">Trạng thái</th>
+                        <th className="text-left p-3 font-bold">Hoạt động</th>
+                        <th className="text-left p-3 font-bold">Đóng góp</th>
+                        <th className="text-center p-3 font-bold"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {TEAM_MEMBERS.map(m => (
+                        <tr key={m.id} className="hover:bg-gray-50">
+                          <td className="p-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm ${m.avatarColor}`}>{m.avatar}</div>
+                              <div>
+                                <p className="font-bold text-gray-900">{m.name}</p>
+                                <p className="text-xs text-gray-500">{m.email}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-3"><span className={`text-xs font-bold px-2 py-1 rounded border ${ROLE_META[m.role].badgeClass}`}>{ROLE_META[m.role].icon} {ROLE_META[m.role].label}</span></td>
+                          <td className="p-3">
+                            {m.status === 'active' ? <span className="text-xs text-emerald-600 font-bold flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span>Active</span> : <span className="text-xs text-amber-600 font-bold">⏳ Chờ kích hoạt</span>}
+                          </td>
+                          <td className="p-3 text-xs text-gray-600">{m.lastSeen}</td>
+                          <td className="p-3 text-xs font-medium text-gray-700">{m.contribution}</td>
+                          <td className="p-3 text-center"><button className="text-gray-400 hover:text-gray-700 p-1">⋯</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              {/* Info card RLS */}
+              <section className="bg-gray-100/60 border border-gray-200 rounded-xl p-5">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-gray-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <div>
+                    <p className="text-sm font-bold text-gray-800 mb-1">Ghi chú kỹ thuật — Supabase RLS</p>
+                    <p className="text-xs text-gray-600 leading-relaxed">Phân quyền hiện đang mock ở client-side. Ở <strong>Step 2</strong>, sẽ triển khai <code className="bg-white/60 px-1 rounded text-emerald-700 font-mono">profiles.role</code> + Row-Level Security policies trên PostgreSQL: mỗi bảng có policy check role của <code className="bg-white/60 px-1 rounded text-emerald-700 font-mono">auth.uid()</code>. Bảng <code className="bg-white/60 px-1 rounded text-emerald-700 font-mono">customers</code> có VIEW mask (SĐT/Email ẩn) cho role Accountant.</p>
+                  </div>
+                </div>
+              </section>
+
+            </div>
+          )}
         </div>
       </main>
 
