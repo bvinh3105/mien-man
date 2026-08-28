@@ -4,13 +4,14 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 // import AdminGuard from '@/components/AdminGuard'; // TODO: bật lại khi deploy
 import {
-  DndContext, 
-  DragOverlay, 
-  closestCorners, 
-  KeyboardSensor, 
-  PointerSensor, 
-  useSensor, 
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
   useSensors,
+  useDroppable,
   DragStartEvent,
   DragOverEvent,
   DragEndEvent,
@@ -25,6 +26,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import GitProgressTracker, { type ProgressStep } from '@/components/GitProgressTracker';
+import { useProducts, createProduct, updateProduct, deleteProduct, type ProductInput } from '@/lib/products';
 import {
   DAILY_REVENUE,
   MONTHLY_PL,
@@ -87,10 +89,32 @@ const STAFF = [
 ];
 
 const INITIAL_ORDERS = [
+  // === CHỜ XỬ LÝ === (chờ admin duyệt/phân công)
   { id: 'MM-0042', status: 'pending', color: 'gray', name: 'Khánh Huyền', price: '700.000đ', paymentMethod: 'COD', time: '2 phút trước', items: 'Túi Tote Hoa Cúc (x2)', avatar: 'KH', assignee: null as typeof STAFF[number] | null },
   { id: 'MM-0043', status: 'pending', color: 'gray', name: 'An Nguyễn', price: '250.000đ', paymentMethod: 'MOMO', time: '1 giờ trước', items: 'Mũ Bucket Custom', avatar: 'AN', urgent: true, assignee: null as typeof STAFF[number] | null },
+  { id: 'MM-0044', status: 'pending', color: 'gray', name: 'Trần Thảo Vy', price: '890.000đ', paymentMethod: 'VNPAY', time: '20 phút trước', items: 'Tranh thêu hoa sen', avatar: 'TV', assignee: null as typeof STAFF[number] | null, hasCustomDesign: true },
+
+  // === ĐANG SẢN XUẤT === (thợ đang thêu)
   { id: 'MM-0038', status: 'producing', color: 'blue', name: 'Thảo Lê', price: '1.200.000đ', paymentMethod: 'VNPAY', time: 'Hôm qua', items: 'Vỏ gối Linen (x5)', avatar: 'TL', progress: 60, machine: 'Máy #02', assignee: STAFF[0] },
+  { id: 'MM-0039', status: 'producing', color: 'blue', name: 'Ngọc Hà', price: '520.000đ', paymentMethod: 'MOMO', time: '2 ngày trước', items: 'Khăn Thêu Chữ Nghệ Thuật', avatar: 'NH', progress: 30, machine: 'Bàn thêu tay', assignee: STAFF[1] },
+
+  // === TẠM DỪNG === (có vấn đề)
   { id: 'MM-0040', status: 'issue', color: 'purple', name: 'Bảo Trần', price: '350.000đ', paymentMethod: 'COD', time: '2 ngày trước', items: 'Túi Canvas Custom', avatar: 'BT', note: 'Hết chỉ đỏ mã #42R', assignee: STAFF[1] },
+
+  // === KIỂM TRA QC === (đã thêu xong, chờ QC)
+  { id: 'MM-0037', status: 'qc', color: 'green', name: 'Minh Đức', price: '450.000đ', paymentMethod: 'VNPAY', time: '3 giờ trước', items: 'Áo Phông Thêu Logo (x2)', avatar: 'MĐ', assignee: STAFF[2], qcStep: 'Kiểm đường chỉ' },
+  { id: 'MM-0036', status: 'qc', color: 'green', name: 'Hồng Yến', price: '760.000đ', paymentMethod: 'MOMO', time: '5 giờ trước', items: 'Bộ tự thêu hoa cúc (x3)', avatar: 'HY', assignee: STAFF[2], qcStep: 'Đóng gói' },
+
+  // === ĐANG GIAO === (đã bàn giao đơn vị vận chuyển)
+  { id: 'MM-0034', status: 'shipping', color: 'amber', name: 'Phương Anh', price: '580.000đ', paymentMethod: 'COD', time: '1 ngày trước', items: 'Thêu tên áo phông (x3)', avatar: 'PA', assignee: STAFF[2], shipper: 'GHN', trackingNo: 'GHN2612345' },
+  { id: 'MM-0032', status: 'shipping', color: 'amber', name: 'Diệu Anh', price: '1.020.000đ', paymentMethod: 'VNPAY', time: '2 ngày trước', items: 'Thêu logo đồng phục (x5)', avatar: 'DA', assignee: STAFF[0], shipper: 'GHTK', trackingNo: 'GHTK8899123' },
+
+  // === HOÀN THÀNH === (khách đã nhận)
+  { id: 'MM-0035', status: 'delivered', color: 'emerald', name: 'Minh Tú', price: '350.000đ', paymentMethod: 'MOMO', time: '3 ngày trước', items: 'Tote Cúc Họa Mi', avatar: 'MT', assignee: STAFF[0], rating: 5, completedAt: '25/08/2026' },
+  { id: 'MM-0030', status: 'delivered', color: 'emerald', name: 'Hà Anh', price: '890.000đ', paymentMethod: 'VNPAY', time: '5 ngày trước', items: 'Tranh phong cảnh làng quê', avatar: 'HA', assignee: STAFF[1], rating: 4, completedAt: '23/08/2026' },
+
+  // === ĐÃ HỦY === (đơn bị hủy)
+  { id: 'MM-0041', status: 'cancelled', color: 'red', name: 'Thu Trang', price: '280.000đ', paymentMethod: 'COD', time: '1 ngày trước', items: 'Khăn thêu chữ', avatar: 'TT', cancelReason: 'Khách đổi ý trước SX', assignee: null as typeof STAFF[number] | null, cancelledAt: '27/08/2026' },
 ];
 
 // --- LỊCH SỬ ĐƠN HÀNG (đã hoàn thành / hủy / hoàn) ---
@@ -126,9 +150,13 @@ const MOCK_CUSTOMERS = [
 ];
 
 const COLUMNS = [
-  { id: 'pending', title: 'Chờ xử lý', colorClass: 'bg-gray-400', badgeClass: 'bg-gray-300/50 text-gray-600', containerClass: 'bg-gray-200' },
-  { id: 'producing', title: 'Đang sản xuất', colorClass: 'bg-blue-500 animate-pulse', badgeClass: 'bg-gray-300/50 text-gray-600', containerClass: 'bg-gray-200', borderTop: 'border-t-4 border-t-blue-500' },
-  { id: 'issue', title: 'Tạm dừng', colorClass: 'bg-purple-500', badgeClass: 'bg-purple-200 text-purple-800', containerClass: 'bg-purple-50', borderTop: 'border-t-4 border-t-purple-500 bg-purple-50', titleColor: 'text-purple-900' }
+  { id: 'pending',   title: 'Chờ xử lý',    icon: '⏳', colorClass: 'bg-gray-400',                  badgeClass: 'bg-gray-300/50 text-gray-600',   containerClass: 'bg-gray-100',    borderTop: '' },
+  { id: 'producing', title: 'Đang sản xuất', icon: '🧵', colorClass: 'bg-blue-500 animate-pulse',   badgeClass: 'bg-blue-100 text-blue-700',     containerClass: 'bg-blue-50/40',   borderTop: 'border-t-4 border-t-blue-500' },
+  { id: 'issue',     title: 'Tạm dừng',     icon: '⏸', colorClass: 'bg-purple-500',                badgeClass: 'bg-purple-200 text-purple-800', containerClass: 'bg-purple-50',   borderTop: 'border-t-4 border-t-purple-500', titleColor: 'text-purple-900' },
+  { id: 'qc',        title: 'Kiểm tra QC',  icon: '🔍', colorClass: 'bg-green-500',                 badgeClass: 'bg-green-100 text-green-700',   containerClass: 'bg-green-50/40', borderTop: 'border-t-4 border-t-green-500' },
+  { id: 'shipping',  title: 'Đang giao',    icon: '🚚', colorClass: 'bg-amber-500',                 badgeClass: 'bg-amber-100 text-amber-700',   containerClass: 'bg-amber-50/40', borderTop: 'border-t-4 border-t-amber-500' },
+  { id: 'delivered', title: 'Hoàn thành',   icon: '✅', colorClass: 'bg-emerald-500',               badgeClass: 'bg-emerald-100 text-emerald-700', containerClass: 'bg-emerald-50/40', borderTop: 'border-t-4 border-t-emerald-500' },
+  { id: 'cancelled', title: 'Đã hủy',       icon: '❌', colorClass: 'bg-red-500',                   badgeClass: 'bg-red-100 text-red-700',       containerClass: 'bg-red-50/40',   borderTop: 'border-t-4 border-t-red-400', titleColor: 'text-red-800' },
 ];
 
 // --- SORTABLE ITEM COMPONENT ---
@@ -150,67 +178,143 @@ function SortableOrderCard({ order, onClick, isOverlay }: { order: any, onClick?
 
   const badgeColor = order.paymentMethod === 'MOMO' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700';
 
+  const isTerminal = order.status === 'delivered' || order.status === 'cancelled';
+
   return (
-    <div 
-      ref={setNodeRef} 
-      style={style} 
-      {...attributes} 
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
       {...listeners}
       onClick={onClick}
-      className={`bg-white rounded-lg p-4 shadow-sm cursor-grab border border-transparent hover:shadow-md hover:border-gray-300 transition-all ${order.status === 'issue' ? 'border-l-4 border-l-purple-500' : ''} ${isOverlay ? 'shadow-xl rotate-2 cursor-grabbing' : ''}`}
+      className={`bg-white rounded-lg p-4 shadow-sm cursor-grab border hover:shadow-md hover:border-gray-300 transition-all
+        ${order.status === 'issue' ? 'border-l-4 border-l-purple-500 border-transparent' : ''}
+        ${order.status === 'qc' ? 'border-l-4 border-l-green-500 border-transparent' : ''}
+        ${order.status === 'shipping' ? 'border-l-4 border-l-amber-500 border-transparent' : ''}
+        ${order.status === 'delivered' ? 'border-l-4 border-l-emerald-500 border-transparent bg-emerald-50/30' : ''}
+        ${order.status === 'cancelled' ? 'border-l-4 border-l-red-400 border-transparent bg-red-50/30 opacity-70' : ''}
+        ${!['issue','qc','shipping','delivered','cancelled'].includes(order.status) ? 'border-transparent' : ''}
+        ${isOverlay ? 'shadow-xl rotate-2 cursor-grabbing' : ''}
+      `}
     >
+      {/* Header: ID + Timestamp/Badge */}
       <div className="flex justify-between items-start mb-2">
-        <span className="text-sm font-bold text-gray-900">{order.id}</span>
-        {order.status === 'issue' ? (
-           <span className="text-[10px] text-white bg-purple-500 px-1.5 py-0.5 rounded uppercase font-bold">Hold</span>
-        ) : order.urgent ? (
-          <span className="text-xs text-red-500 font-medium">⚠ Trễ</span>
-        ) : (
-          <span className="text-xs text-gray-500">{order.time}</span>
+        <span className={`text-sm font-bold ${order.status === 'cancelled' ? 'text-gray-500 line-through' : 'text-gray-900'}`}>{order.id}</span>
+        {order.status === 'issue' && <span className="text-[10px] text-white bg-purple-500 px-1.5 py-0.5 rounded uppercase font-bold">Hold</span>}
+        {order.status === 'qc' && <span className="text-[10px] text-white bg-green-500 px-1.5 py-0.5 rounded uppercase font-bold">QC</span>}
+        {order.status === 'delivered' && <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-0.5">✓ Đã nhận</span>}
+        {order.status === 'cancelled' && <span className="text-[10px] font-bold text-red-600 uppercase">Đã hủy</span>}
+        {order.status === 'shipping' && !order.trackingNo && <span className="text-xs text-amber-600 font-medium">🚚 Đang giao</span>}
+        {!['issue','qc','delivered','cancelled','shipping'].includes(order.status) && (
+          order.urgent ? <span className="text-xs text-red-500 font-medium">⚠ Trễ</span> : <span className="text-xs text-gray-500">{order.time}</span>
         )}
       </div>
-      
-      <h3 className="font-medium text-gray-800 text-sm mb-2">{order.items}</h3>
-      
-      {order.status === 'issue' && order.note && (
-        <p className="text-xs text-gray-500 mb-2 border-l-2 border-gray-200 pl-2 italic">{order.note}</p>
+
+      {/* Item name */}
+      <h3 className={`font-medium text-sm mb-2 ${order.status === 'cancelled' ? 'text-gray-500 line-through' : order.status === 'delivered' ? 'text-emerald-800' : 'text-gray-800'}`}>{order.items}</h3>
+
+      {/* Custom design badge */}
+      {order.hasCustomDesign && (
+        <span className="inline-block text-[10px] font-bold bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded mb-2">🎨 Custom design</span>
       )}
-      
-      {order.status === 'producing' && order.progress && (
-        <div className="w-full bg-gray-100 rounded-full h-1.5 mb-3">
-          <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${order.progress}%` }}></div>
+
+      {/* ISSUE — note */}
+      {order.status === 'issue' && order.note && (
+        <p className="text-xs text-gray-500 mb-2 border-l-2 border-purple-300 pl-2 italic">{order.note}</p>
+      )}
+
+      {/* CANCELLED — reason */}
+      {order.status === 'cancelled' && order.cancelReason && (
+        <div className="bg-red-50 border border-red-100 rounded p-2 mb-2">
+          <p className="text-[10px] text-red-700 font-bold uppercase mb-0.5">Lý do hủy</p>
+          <p className="text-xs text-red-600">{order.cancelReason}</p>
         </div>
       )}
 
-      {order.urgent && order.status !== 'issue' && (
+      {/* PRODUCING — progress bar */}
+      {order.status === 'producing' && order.progress && (
+        <>
+          <div className="flex justify-between text-[10px] font-mono text-gray-500 mb-0.5">
+            <span>Tiến độ thêu</span><span className="font-bold text-blue-600">{order.progress}%</span>
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-1.5 mb-3">
+            <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${order.progress}%` }}></div>
+          </div>
+        </>
+      )}
+
+      {/* QC — step badge */}
+      {order.status === 'qc' && order.qcStep && (
+        <div className="bg-green-50 border border-green-100 rounded p-2 mb-2 flex items-center gap-2">
+          <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+          <span className="text-[11px] text-green-700 font-medium">Bước: {order.qcStep}</span>
+        </div>
+      )}
+
+      {/* SHIPPING — tracking info */}
+      {order.status === 'shipping' && order.trackingNo && (
+        <div className="bg-amber-50 border border-amber-100 rounded p-2 mb-2">
+          <div className="flex items-center justify-between mb-0.5">
+            <span className="text-[10px] font-bold text-amber-700 uppercase">🚚 {order.shipper}</span>
+            <span className="text-[10px] text-amber-600 font-bold">Đang giao</span>
+          </div>
+          <p className="text-xs font-mono text-amber-800 font-bold">{order.trackingNo}</p>
+        </div>
+      )}
+
+      {/* DELIVERED — rating */}
+      {order.status === 'delivered' && order.rating && (
+        <div className="bg-emerald-50 border border-emerald-100 rounded p-2 mb-2 flex items-center justify-between">
+          <span className="text-[11px] font-bold text-emerald-700">Khách đánh giá</span>
+          <span className="text-xs">{'⭐'.repeat(order.rating)}<span className="text-gray-300">{'⭐'.repeat(5 - order.rating)}</span></span>
+        </div>
+      )}
+
+      {/* Urgent flag */}
+      {order.urgent && !['issue','delivered','cancelled'].includes(order.status) && (
         <div className="bg-red-50 text-red-700 text-xs p-1.5 rounded mb-3 mt-1 border border-red-100">Cần gấp thứ 7</div>
       )}
-      
-      {/* Assignee badge (admin only) */}
-      {order.assignee && (
+
+      {/* Assignee (không hiện cho delivered/cancelled) */}
+      {!isTerminal && order.assignee && (
         <div className="flex items-center gap-2 mt-2 p-1.5 bg-gray-50 rounded border border-gray-100">
           <div className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-bold ${order.assignee.color}`}>{order.assignee.avatar}</div>
           <span className="text-[11px] font-medium text-gray-600">{order.assignee.name}</span>
           <span className="text-[9px] text-gray-400 ml-auto">{order.assignee.role}</span>
         </div>
       )}
-      {!order.assignee && (
+      {!isTerminal && !order.assignee && (
         <div className="flex items-center gap-1.5 mt-2 p-1.5 bg-yellow-50 rounded border border-yellow-100 border-dashed">
           <span className="text-[11px] text-yellow-600 font-medium">⚡ Chưa phân công</span>
         </div>
       )}
 
+      {/* Footer: Avatar + Price */}
       <div className="flex items-center justify-between mt-2">
         <div className="flex items-center gap-2">
           {order.status !== 'issue' && <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${badgeColor}`}>{order.avatar}</div>}
           {order.status === 'producing' && order.machine && <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{order.machine}</span>}
+          {order.status === 'delivered' && order.completedAt && <span className="text-[10px] text-emerald-600 font-mono">✓ {order.completedAt}</span>}
+          {order.status === 'cancelled' && order.cancelledAt && <span className="text-[10px] text-red-500 font-mono">{order.cancelledAt}</span>}
         </div>
-        {order.status !== 'issue' && <span className="text-xs font-bold text-gray-900">{order.price}</span>}
+        {order.status !== 'issue' && (
+          <span className={`text-xs font-bold ${order.status === 'cancelled' ? 'text-gray-400 line-through' : order.status === 'delivered' ? 'text-emerald-700' : 'text-gray-900'}`}>{order.price}</span>
+        )}
       </div>
     </div>
   );
 }
 
+
+// --- DROPPABLE COLUMN WRAPPER (để cột trống nhận drop) ---
+function DroppableColumn({ id, children, className = '' }: { id: string; children: React.ReactNode; className?: string }) {
+  const { setNodeRef, isOver } = useDroppable({ id, data: { type: 'Column' } });
+  return (
+    <div ref={setNodeRef} className={`${className} ${isOver ? 'ring-2 ring-emerald-400 ring-inset bg-emerald-50/60' : ''} transition-colors`}>
+      {children}
+    </div>
+  );
+}
 
 // --- PERMISSION CELL COMPONENT (dùng cho ma trận phân quyền) ---
 function PermissionCell({ value, small = false }: { value: RolePermission; small?: boolean }) {
@@ -281,6 +385,70 @@ export default function AdminDashboard() {
     setCustomerModal(null);
   };
 
+  // Step 2: Products từ Supabase (fallback static)
+  const { products: liveProducts, categories: liveCategories, source: productsSource, loading: productsLoading, error: productsError, refresh: refreshProducts } = useProducts();
+  const [productSaving, setProductSaving] = useState(false);
+  const [productDeleteConfirm, setProductDeleteConfirm] = useState<string | null>(null);
+  const [productForm, setProductForm] = useState<Partial<ProductInput>>({});
+
+  // Đồng bộ productForm khi productModal thay đổi
+  React.useEffect(() => {
+    if (productModal && productModal.id) {
+      setProductForm({
+        name: productModal.name,
+        slug: productModal.slug,
+        description: productModal.description,
+        price: productModal.price,
+        salePrice: productModal.salePrice,
+        images: productModal.images ?? [],
+        categoryId: productModal.categoryId,
+      });
+    } else {
+      setProductForm({ name: '', slug: '', description: '', price: 0, salePrice: null, images: [], categoryId: liveCategories[0]?.id ?? '' });
+    }
+  }, [productModal, liveCategories]);
+
+  async function handleSaveProduct() {
+    if (!productForm.name || !productForm.slug || !productForm.price) {
+      alert('Vui lòng nhập đầy đủ Tên, Slug và Giá bán');
+      return;
+    }
+    setProductSaving(true);
+    try {
+      const input: ProductInput = {
+        name: productForm.name!,
+        slug: productForm.slug!,
+        description: productForm.description ?? '',
+        price: Number(productForm.price),
+        salePrice: productForm.salePrice ? Number(productForm.salePrice) : null,
+        stock: 0,
+        images: productForm.images ?? [],
+        categoryId: productForm.categoryId ?? '',
+      };
+      if (productModal?.id) {
+        await updateProduct(productModal.id, input);
+      } else {
+        await createProduct(input);
+      }
+      await refreshProducts();
+      closeAllModals();
+    } catch (e) {
+      alert('Lỗi khi lưu: ' + (e instanceof Error ? e.message : String(e)) + '\n\nSupabase có đang chạy không? Docker Desktop → npx supabase start');
+    } finally {
+      setProductSaving(false);
+    }
+  }
+
+  async function handleDeleteProduct(id: string) {
+    try {
+      await deleteProduct(id);
+      await refreshProducts();
+      setProductDeleteConfirm(null);
+    } catch (e) {
+      alert('Lỗi khi xoá: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
   const hasAnyModalOpen = !!orderModal || !!productModal || !!customerModal;
 
   // --- DND KIT LOGIC ---
@@ -310,9 +478,19 @@ export default function AdminDashboard() {
 
     const isActiveTask = active.data.current?.type === 'Order';
     const isOverTask = over.data.current?.type === 'Order';
-    const isOverColumn = COLUMNS.some(col => col.id === overId);
+    const isOverColumn = over.data.current?.type === 'Column' || COLUMNS.some(col => col.id === overId);
 
     if (!isActiveTask) return;
+
+    // Map status → màu badge card
+    const colorFor = (s: string) =>
+      s === 'pending' ? 'gray' :
+      s === 'producing' ? 'blue' :
+      s === 'issue' ? 'purple' :
+      s === 'qc' ? 'green' :
+      s === 'shipping' ? 'amber' :
+      s === 'delivered' ? 'emerald' :
+      s === 'cancelled' ? 'red' : 'gray';
 
     // Kéo thả giữa các Order (cùng cột hoặc khác cột)
     if (isActiveTask && isOverTask) {
@@ -324,10 +502,10 @@ export default function AdminDashboard() {
           // Khác cột -> Chuyển cột và cập nhật status (cập nhật màu sắc Kanban)
           const updatedOrders = [...orders];
           const newStatus = orders[overIndex].status;
-          updatedOrders[activeIndex] = { 
-            ...updatedOrders[activeIndex], 
+          updatedOrders[activeIndex] = {
+            ...updatedOrders[activeIndex],
             status: newStatus,
-            color: newStatus === 'pending' ? 'gray' : newStatus === 'producing' ? 'blue' : 'purple'
+            color: colorFor(newStatus),
           };
           return arrayMove(updatedOrders, activeIndex, overIndex);
         }
@@ -336,18 +514,19 @@ export default function AdminDashboard() {
       });
     }
 
-    // Kéo thả vào Cột trống
+    // Kéo thả vào Cột trống (isOverColumn: khi hover DroppableColumn hoặc empty SortableContext)
     if (isActiveTask && isOverColumn) {
       setOrders(orders => {
         const activeIndex = orders.findIndex(t => t.id === activeId);
-        const updatedOrders = [...orders];
+        if (activeIndex === -1) return orders;
         const newStatus = overId as string;
-        updatedOrders[activeIndex] = { 
-          ...updatedOrders[activeIndex], 
+        if (orders[activeIndex].status === newStatus) return orders;
+        const updatedOrders = [...orders];
+        updatedOrders[activeIndex] = {
+          ...updatedOrders[activeIndex],
           status: newStatus,
-          color: newStatus === 'pending' ? 'gray' : newStatus === 'producing' ? 'blue' : 'purple'
+          color: colorFor(newStatus),
         };
-        // Dịch chuyển item xuống cuối danh sách của cột đó
         return arrayMove(updatedOrders, activeIndex, updatedOrders.length - 1);
       });
     }
@@ -843,33 +1022,63 @@ export default function AdminDashboard() {
               onDragOver={handleDragOver}
               onDragEnd={handleDragEnd}
             >
-              <div className="flex gap-6 overflow-x-auto p-6 h-full items-start bg-gray-50">
-                {COLUMNS.map(col => {
-                  const columnOrders = orders.filter(o => o.status === col.id);
-                  return (
-                    <div key={col.id} className={`min-w-[300px] w-[300px] rounded-xl flex flex-col max-h-full shrink-0 ${col.containerClass}`}>
-                      <div className={`p-4 font-semibold flex justify-between items-center ${col.borderTop ? col.borderTop + ' rounded-t-xl' : 'text-gray-700 border-b border-black/5'} shrink-0`}>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-3 h-3 rounded-full ${col.colorClass}`}></div>
-                          <span className={col.titleColor || ''}>{col.title}</span>
+              <div className="flex flex-col h-full bg-gray-50">
+                {/* Summary bar */}
+                <div className="px-6 py-3 bg-white border-b border-gray-200 flex items-center gap-4 text-xs overflow-x-auto shrink-0">
+                  {COLUMNS.map(col => {
+                    const cnt = orders.filter(o => o.status === col.id).length;
+                    const val = orders.filter(o => o.status === col.id).reduce((s, o) => s + parseInt(o.price.replace(/[^\d]/g, '')), 0);
+                    return (
+                      <div key={col.id} className="flex items-center gap-1.5 shrink-0">
+                        <span className={`w-2 h-2 rounded-full ${col.colorClass}`}></span>
+                        <span className="text-gray-500">{col.title}:</span>
+                        <span className="font-bold text-gray-900">{cnt}</span>
+                        {cnt > 0 && <span className="text-gray-400 font-mono">({(val / 1000).toFixed(0)}k)</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex gap-4 overflow-x-auto p-4 flex-1 items-start">
+                  {COLUMNS.map(col => {
+                    const columnOrders = orders.filter(o => o.status === col.id);
+                    const colValue = columnOrders.reduce((s, o) => s + parseInt(o.price.replace(/[^\d]/g, '')), 0);
+                    return (
+                      <div key={col.id} className={`min-w-[260px] w-[260px] rounded-xl flex flex-col max-h-full shrink-0 ${col.containerClass} border border-gray-200/50`}>
+                        <div className={`p-3 font-semibold ${col.borderTop ? col.borderTop + ' rounded-t-xl' : 'text-gray-700 border-b border-black/5'} shrink-0`}>
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">{col.icon}</span>
+                              <span className={`text-sm ${col.titleColor || ''}`}>{col.title}</span>
+                            </div>
+                            <span className={`text-[10px] py-0.5 px-1.5 rounded-full font-bold ${col.badgeClass}`}>{columnOrders.length}</span>
+                          </div>
+                          {colValue > 0 && (
+                            <p className="text-[10px] text-gray-500 mt-1 font-mono">Tổng: {colValue.toLocaleString('vi-VN')}đ</p>
+                          )}
                         </div>
-                        <span className={`text-xs py-0.5 px-2 rounded-full font-bold ${col.badgeClass}`}>{columnOrders.length}</span>
+
+                        <DroppableColumn id={col.id} className="p-2.5 flex-1 overflow-y-auto flex flex-col gap-2.5 min-h-[200px]">
+                          <SortableContext
+                            id={col.id}
+                            items={columnOrders.map(o => o.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {columnOrders.map(order => (
+                              <SortableOrderCard key={order.id} order={order} onClick={() => setOrderModal({ ...order, uiStatus: col.title })} />
+                            ))}
+                            {columnOrders.length === 0 && (
+                              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center text-center min-h-[160px] pointer-events-none">
+                                <span className="text-2xl opacity-40 mb-1">{col.icon}</span>
+                                <p className="text-xs text-gray-400">Kéo thả vào đây</p>
+                              </div>
+                            )}
+                          </SortableContext>
+                        </DroppableColumn>
                       </div>
-                      
-                      <div className="p-3 flex-1 overflow-y-auto flex flex-col gap-3">
-                        <SortableContext 
-                          id={col.id}
-                          items={columnOrders.map(o => o.id)} 
-                          strategy={verticalListSortingStrategy}
-                        >
-                          {columnOrders.map(order => (
-                            <SortableOrderCard key={order.id} order={order} onClick={() => setOrderModal({ ...order, uiStatus: col.title })} />
-                          ))}
-                        </SortableContext>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Hộp hiệu ứng kéo thả mượt mà */}
@@ -977,53 +1186,83 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Existing product mgmt cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm"><h3 className="text-sm font-medium text-gray-500 mb-1">Sản phẩm demo (MOCK_PRODUCTS)</h3><p className="text-2xl font-bold text-gray-900">{MOCK_PRODUCTS.length}</p></div>
-              </div>
-              
-              <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500">
-                      <th className="p-4 font-bold">Sản phẩm</th>
-                      <th className="p-4 font-bold text-gray-400">Giá Cost</th>
-                      <th className="p-4 font-bold">Giá bán cuối</th>
-                      <th className="p-4 font-bold">Tồn kho</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {MOCK_PRODUCTS.map((prod, i) => (
-                      <tr key={i} className="hover:bg-gray-50 cursor-pointer transition" onClick={() => setProductModal(prod)}>
-                        <td className="p-4 flex items-center gap-3">
-                          <div className="w-10 h-10 bg-blue-100 text-blue-700 rounded flex items-center justify-center font-bold">{prod.avatar}</div>
-                          <div><p className="font-bold text-sm text-gray-900">{prod.name}</p></div>
-                        </td>
-                        <td className="p-4 text-sm text-gray-400 font-mono">{prod.cost}</td>
-                        <td className="p-4 font-bold text-sm">
-                          {prod.discount ? (
-                            <>
-                              <div className="flex items-center gap-2">
-                                <span className="text-gray-400 line-through text-xs font-normal">{prod.originalPrice}</span>
-                                <span className="text-red-600 bg-red-50 text-[10px] px-1 py-0.5 rounded">-{prod.discount}</span>
-                              </div>
-                              <span className="text-gray-900">{prod.finalPrice}</span>
-                            </>
-                          ) : (
-                            <span className="text-gray-900">{prod.finalPrice}</span>
-                          )}
-                        </td>
-                        <td className="p-4">
-                          {prod.alert ? (
-                            <span className="text-xs font-bold text-red-600">⚠ {prod.stock} (Hết hàng)</span>
-                          ) : (
-                            <span className="text-xs font-bold text-green-600">{prod.stock} (Còn hàng)</span>
-                          )}
-                        </td>
+              {/* ===== SUPABASE LIVE PRODUCTS (Step 2) ===== */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">📦 Sản phẩm ({liveProducts.length})</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      {productsSource === 'live' ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Supabase LIVE
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
+                          ⚠ Static fallback
+                        </span>
+                      )}
+                      {productsLoading && <span className="text-[10px] text-gray-500">Đang tải...</span>}
+                      {productsError && <span className="text-[10px] text-red-500" title={productsError}>Supabase offline — dùng data.ts</span>}
+                      <button onClick={refreshProducts} className="text-[10px] text-blue-600 font-bold hover:underline">↻ Refresh</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500">
+                      <tr>
+                        <th className="p-3 font-bold">Sản phẩm</th>
+                        <th className="p-3 font-bold">Danh mục</th>
+                        <th className="p-3 font-bold text-right">Giá gốc</th>
+                        <th className="p-3 font-bold text-right">Giá bán</th>
+                        <th className="p-3 font-bold text-center">Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {liveProducts.map(prod => (
+                        <tr key={prod.id} className="hover:bg-gray-50 transition">
+                          <td className="p-3">
+                            <div className="flex items-center gap-3">
+                              {prod.images[0] && (
+                                <div className="w-10 h-10 rounded overflow-hidden bg-gray-100 shrink-0">
+                                  <img src={prod.images[0]} alt={prod.name} className="w-full h-full object-cover" />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="font-bold text-gray-900 text-sm truncate">{prod.name}</p>
+                                <p className="text-[10px] text-gray-500 font-mono">{prod.slug}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-3 text-xs text-gray-600">{prod.category.name}</td>
+                          <td className="p-3 text-right font-mono text-xs text-gray-500 {prod.salePrice ? 'line-through' : ''}">{formatVnd(prod.price)}</td>
+                          <td className="p-3 text-right font-bold text-emerald-600">{formatVnd(prod.salePrice ?? prod.price)}</td>
+                          <td className="p-3 text-center">
+                            <div className="flex gap-1 justify-center">
+                              <button onClick={() => setProductModal(prod)} className="text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-1 rounded hover:bg-blue-200">Sửa</button>
+                              <button onClick={() => setProductDeleteConfirm(prod.id)} className="text-[10px] bg-red-100 text-red-700 font-bold px-2 py-1 rounded hover:bg-red-200">Xoá</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Delete confirm modal */}
+                {productDeleteConfirm && (
+                  <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={() => setProductDeleteConfirm(null)}>
+                    <div className="bg-white rounded-xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+                      <h3 className="text-lg font-bold mb-2">Xoá sản phẩm?</h3>
+                      <p className="text-sm text-gray-600 mb-4">Sản phẩm sẽ bị ẩn khỏi shop (soft delete). Có thể khôi phục sau.</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => setProductDeleteConfirm(null)} className="flex-1 py-2 border border-gray-300 rounded-lg font-bold text-sm">Huỷ</button>
+                        <button onClick={() => handleDeleteProduct(productDeleteConfirm)} className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-sm">Xoá</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1880,44 +2119,101 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* SLIDE-OVER: PRODUCT */}
-      <div className={`fixed top-0 right-0 h-full w-full max-w-[450px] bg-white shadow-2xl z-50 transform transition-transform duration-300 flex flex-col ${productModal ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between bg-white z-10 shrink-0">
-          <h2 className="text-xl font-bold">{productModal?.name ? 'Sửa sản phẩm' : 'Thêm sản phẩm mới'}</h2>
-          <button onClick={closeAllModals} className="p-2 text-gray-400 hover:bg-gray-100 rounded-full h-fit">✕</button>
+      {/* SLIDE-OVER: PRODUCT — Supabase connected */}
+      <div className={`fixed top-0 right-0 h-full w-full max-w-[500px] bg-white shadow-2xl z-50 transform transition-transform duration-300 flex flex-col ${productModal ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-white z-10 shrink-0">
+          <div>
+            <h2 className="text-xl font-bold">{productModal?.id ? 'Sửa sản phẩm' : 'Thêm sản phẩm mới'}</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{productsSource === 'live' ? '📡 Lưu trực tiếp lên Supabase' : '⚠ Supabase offline — thao tác sẽ báo lỗi'}</p>
+          </div>
+          <button onClick={closeAllModals} className="p-2 text-gray-400 hover:bg-gray-100 rounded-full">✕</button>
         </div>
-        <div className="flex-1 overflow-y-auto p-6 bg-white space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 bg-white space-y-5">
           <div>
-            <label className="block text-sm font-bold mb-1 text-gray-900">Tên sản phẩm</label>
-            <input type="text" defaultValue={productModal?.name} placeholder="VD: Túi Tote" className="w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-bold mb-1 text-gray-600">Giá vốn (Cost)</label>
-              <input type="text" defaultValue={productModal?.cost?.replace('đ','')} placeholder="150000" className="w-full border border-gray-300 rounded-md py-2 px-3 text-sm font-mono outline-none focus:border-blue-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-bold mb-1 text-gray-900">Giá bán gốc</label>
-              <input type="text" defaultValue={productModal?.originalPrice?.replace('đ','')} placeholder="350000" className="w-full border border-gray-300 rounded-md py-2 px-3 text-sm font-mono outline-none focus:border-blue-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-bold mb-1 text-red-600">% Giảm giá</label>
-              <div className="relative">
-                <input type="number" defaultValue={productModal?.discount?.replace('%','')} placeholder="0" className="w-full border border-red-300 text-red-700 rounded-md py-2 px-3 text-sm bg-red-50 focus:ring-red-500 outline-none font-bold pr-8" />
-                <span className="absolute right-3 top-2 text-red-500 font-bold">%</span>
-              </div>
-            </div>
+            <label className="block text-xs font-bold uppercase mb-1 text-gray-600">Tên sản phẩm *</label>
+            <input
+              type="text"
+              value={productForm.name ?? ''}
+              onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+              placeholder="VD: Tranh thêu hoa sen"
+              className="w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+            />
           </div>
           <div>
-            <label className="block text-sm font-bold mb-1 text-gray-900">Kho & Biến thể</label>
-            <div className="border border-gray-200 rounded-lg bg-gray-50 p-4 text-center text-gray-500 text-sm">
-              [ Form nhập biến thể & Tồn kho JSONB sẽ render tại đây ]
+            <label className="block text-xs font-bold uppercase mb-1 text-gray-600">Slug URL *</label>
+            <input
+              type="text"
+              value={productForm.slug ?? ''}
+              onChange={(e) => setProductForm({ ...productForm, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
+              placeholder="tranh-theu-hoa-sen"
+              className="w-full border border-gray-300 rounded-md py-2 px-3 text-sm font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
+            />
+            <p className="text-[10px] text-gray-400 mt-1">Đường dẫn shop: /product/{productForm.slug || 'slug'}</p>
+          </div>
+          <div>
+            <label className="block text-xs font-bold uppercase mb-1 text-gray-600">Danh mục</label>
+            <select
+              value={productForm.categoryId ?? ''}
+              onChange={(e) => setProductForm({ ...productForm, categoryId: e.target.value })}
+              className="w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+            >
+              {liveCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold uppercase mb-1 text-gray-600">Mô tả</label>
+            <textarea
+              rows={3}
+              value={productForm.description ?? ''}
+              onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+              placeholder="Chi tiết sản phẩm..."
+              className="w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase mb-1 text-gray-600">Giá bán gốc * (VND)</label>
+              <input
+                type="number"
+                value={productForm.price ?? ''}
+                onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) })}
+                placeholder="850000"
+                className="w-full border border-gray-300 rounded-md py-2 px-3 text-sm font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase mb-1 text-red-600">Giá sale (VND)</label>
+              <input
+                type="number"
+                value={productForm.salePrice ?? ''}
+                onChange={(e) => setProductForm({ ...productForm, salePrice: e.target.value ? Number(e.target.value) : null })}
+                placeholder="720000 (để trống nếu không sale)"
+                className="w-full border border-red-300 text-red-700 rounded-md py-2 px-3 text-sm bg-red-50 focus:ring-red-500 outline-none font-mono"
+              />
             </div>
           </div>
+          <div>
+            <label className="block text-xs font-bold uppercase mb-1 text-gray-600">URL ảnh (1 dòng 1 URL)</label>
+            <textarea
+              rows={2}
+              value={(productForm.images ?? []).join('\n')}
+              onChange={(e) => setProductForm({ ...productForm, images: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
+              placeholder="https://placehold.co/600x800/..."
+              className="w-full border border-gray-300 rounded-md py-2 px-3 text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+            />
+          </div>
+          {productForm.images && productForm.images[0] && (
+            <div className="border border-gray-200 rounded-lg p-2 bg-gray-50">
+              <p className="text-[10px] uppercase font-bold text-gray-500 mb-2">Preview</p>
+              <img src={productForm.images[0]} alt="preview" className="w-full h-32 object-cover rounded" />
+            </div>
+          )}
         </div>
         <div className="p-4 border-t border-gray-200 bg-gray-50 flex gap-3 shrink-0">
-          <button onClick={closeAllModals} className="flex-1 bg-white border border-gray-300 py-2.5 rounded-lg font-bold text-sm text-gray-700">Hủy</button>
-          <button className="flex-[2] bg-blue-600 text-white py-2.5 rounded-lg font-bold text-sm shadow-sm hover:bg-blue-700">Lưu Dữ Liệu</button>
+          <button onClick={closeAllModals} disabled={productSaving} className="flex-1 bg-white border border-gray-300 py-2.5 rounded-lg font-bold text-sm text-gray-700 disabled:opacity-50">Hủy</button>
+          <button onClick={handleSaveProduct} disabled={productSaving} className="flex-[2] bg-emerald-600 text-white py-2.5 rounded-lg font-bold text-sm shadow-sm hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
+            {productSaving ? (<><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" /><path fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>Đang lưu...</>) : (productModal?.id ? 'Cập nhật' : 'Tạo sản phẩm')}
+          </button>
         </div>
       </div>
 
