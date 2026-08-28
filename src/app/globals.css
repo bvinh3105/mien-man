@@ -66,3 +66,15 @@ h1, h2, h3, h4, h5, h6 {
   stroke-dasharray: 200;
   animation: mmStitch 2s ease-out forwards;
 }
+
+/* Printify Style Animations */
+.marquee-container { overflow: hidden; white-space: nowrap; width: 100%; background: #fff; border-top: 1px solid #eee; border-bottom: 1px solid #eee; padding: 12px 0; }
+.marquee-content { display: inline-block; animation: marquee 20s linear infinite; }
+.marquee-item { display: inline-flex; align-items: center; gap: 8px; margin-right: 48px; font-weight: 600; color: #2CC274; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+@keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+.float { animation: float 6s ease-in-out infinite; }
+@keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-15px); } 100% { transform: translateY(0px); } }
+
+.check-list li { position: relative; padding-left: 32px; margin-bottom: 16px; font-weight: 500; color: #474A57; }
+.check-list li::before { content: '?'; position: absolute; left: 0; top: -2px; width: 20px; height: 20px; color: #2CC274; font-weight: 800; font-size: 18px; }

@@ -9,6 +9,14 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        brand: {
+          DEFAULT: '#2CC274',
+          dark: '#1F9C59',
+          light: '#E8F8F0'
+        },
+        dark: '#18191F',
+        muted: '#474A57',
+        surface: '#F7F9FA',
         sage: {
           DEFAULT: "#7D8B6A",
           50: "#EEF1EA",

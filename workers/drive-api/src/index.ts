@@ -19,7 +19,7 @@ function base64url(data: ArrayBuffer | string): string {
   const str =
     typeof data === "string"
       ? btoa(data)
-      : btoa(String.fromCharCode(...new Uint8Array(data)));
+      : btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(data))));
   return str.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
