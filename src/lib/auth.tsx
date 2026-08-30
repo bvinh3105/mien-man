@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import type { Profile } from "@/types/database";
-import { supabase } from "./supabase";
+import { getSupabaseSafe } from "./supabase";
 
 interface AuthState {
   user: User | null;
@@ -32,7 +32,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Fetch profile from profiles table
   async function fetchProfile(userId: string) {
-    const { data } = await supabase
+    const sb = getSupabaseSafe();
+    if (!sb) return;
+    const { data } = await sb
       .from("profiles")
       .select("*")
       .eq("id", userId)
@@ -41,8 +43,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    // Get initial session — safe khi Supabase offline
-    supabase.auth
+    const sb = getSupabaseSafe();
+    if (!sb) {
+      // Supabase chưa config → bỏ qua auth, app vẫn chạy bình thường
+      setLoading(false);
+      return;
+    }
+
+    // Get initial session
+    sb.auth
       .getSession()
       .then(({ data: { session: s } }) => {
         setSession(s);
@@ -57,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     let subscription: { unsubscribe: () => void } | null = null;
     try {
-      const result = supabase.auth.onAuthStateChange((_event, s) => {
+      const result = sb.auth.onAuthStateChange((_event, s) => {
         setSession(s);
         setUser(s?.user ?? null);
         if (s?.user) {
@@ -75,8 +84,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function signUp(email: string, password: string, fullName: string) {
+    const sb = getSupabaseSafe();
+    if (!sb) return { error: "Supabase chưa được cấu hình." };
     try {
-      const { error } = await supabase.auth.signUp({
+      const { error } = await sb.auth.signUp({
         email,
         password,
         options: { data: { full_name: fullName } },
@@ -88,8 +99,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signIn(email: string, password: string) {
+    const sb = getSupabaseSafe();
+    if (!sb) return { error: "Supabase chưa được cấu hình." };
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error } = await sb.auth.signInWithPassword({
         email,
         password,
       });
@@ -100,10 +113,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
-    try {
-      await supabase.auth.signOut();
-    } catch {
-      // Supabase unreachable — vẫn clear local state
+    const sb = getSupabaseSafe();
+    if (sb) {
+      try {
+        await sb.auth.signOut();
+      } catch {
+        // Supabase unreachable — vẫn clear local state
+      }
     }
     setProfile(null);
   }
