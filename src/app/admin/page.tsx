@@ -131,6 +131,7 @@ const ORDER_HISTORY = [
 ];
 
 // Retention: giữ 60 ngày trong DB, sau đó archive → Excel
+const PROFIT_MARGIN = 0.48; // Biên lợi nhuận ~ 48%
 const RETENTION_DAYS = 60;
 const ARCHIVE_POLICY = {
   keepInDb: RETENTION_DAYS,
@@ -380,10 +381,16 @@ export default function AdminDashboard() {
   const [productModal, setProductModal] = useState<any>(null);
   const [customerModal, setCustomerModal] = useState<any>(null);
 
+  // Revenue drill-down: click vào card doanh thu → xem chi tiết đơn
+  const [revenueDrill, setRevenueDrill] = useState<'delivered' | 'active' | 'all' | 'profit' | null>(null);
+  const [revenueDrillSearch, setRevenueDrillSearch] = useState('');
+
   const closeAllModals = () => {
     setOrderModal(null);
     setProductModal(null);
     setCustomerModal(null);
+    setRevenueDrill(null);
+    setRevenueDrillSearch('');
   };
 
   // Step 2: Products từ Supabase (fallback static)
@@ -450,7 +457,7 @@ export default function AdminDashboard() {
     }
   }
 
-  const hasAnyModalOpen = !!orderModal || !!productModal || !!customerModal;
+  const hasAnyModalOpen = !!orderModal || !!productModal || !!customerModal || !!revenueDrill;
 
   // ─── Map local status ↔ DB status ──────────────────────
   const LOCAL_TO_DB: Record<string, string> = {
@@ -874,8 +881,7 @@ export default function AdminDashboard() {
             // Doanh thu computed realtime từ orders state
             const totalOrders = orders.length;
             const activeOrderCount = orders.filter(o => !['delivered', 'cancelled'].includes(o.status)).length;
-            const profitMargin = 0.48; // Biên lợi nhuận ~ 48%
-            const estimatedProfit = Math.round(revenueDelivered * profitMargin);
+            const estimatedProfit = Math.round(revenueDelivered * PROFIT_MARGIN);
             const chartData = revenueRange === '7' ? DAILY_REVENUE.slice(-7) : DAILY_REVENUE;
             const chartMax = Math.max(...chartData.map(d => d.revenue));
 
@@ -886,33 +892,33 @@ export default function AdminDashboard() {
                 <section>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">💰 Doanh thu &amp; Lợi nhuận <span className="text-[10px] font-normal text-emerald-600">(realtime từ đơn hàng)</span></h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                    <div onClick={() => setRevenueDrill('delivered')} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all group">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Đã thu (hoàn thành)</h4>
-                        <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                        <svg className="w-4 h-4 text-emerald-500 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
                       </div>
                       <p className="text-2xl font-bold text-emerald-700">{formatVnd(revenueDelivered)}</p>
-                      <p className="text-xs text-gray-400 mt-1">{deliveredOrders.length} đơn đã giao</p>
+                      <p className="text-xs text-gray-400 mt-1">{deliveredOrders.length} đơn đã giao · <span className="text-emerald-600 font-medium group-hover:underline">Xem chi tiết →</span></p>
                     </div>
 
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                    <div onClick={() => setRevenueDrill('active')} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:shadow-md hover:border-blue-300 transition-all group">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Đang xử lý</h4>
-                        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                        <svg className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                       </div>
                       <p className="text-2xl font-bold text-gray-900">{formatVnd(revenueActive)}</p>
-                      <p className="text-xs text-gray-400 mt-1">{activeOrderCount} đơn đang xử lý</p>
+                      <p className="text-xs text-gray-400 mt-1">{activeOrderCount} đơn đang xử lý · <span className="text-blue-600 font-medium group-hover:underline">Xem chi tiết →</span></p>
                     </div>
 
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                    <div onClick={() => setRevenueDrill('all')} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:shadow-md hover:border-gray-400 transition-all group">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Tổng doanh thu</h4>
-                        <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        <svg className="w-4 h-4 text-emerald-500 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                       </div>
                       <p className="text-2xl font-bold text-gray-900">{formatVnd(revenueAll)}</p>
                       <div className="mt-2">
                         <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
-                          <span>{totalOrders} đơn tổng cộng</span>
+                          <span>{totalOrders} đơn tổng cộng · <span className="text-gray-600 font-medium group-hover:underline">Xem chi tiết →</span></span>
                           <span className="font-bold text-gray-700">{cancelledOrders.length > 0 ? `${cancelledOrders.length} hủy` : 'Chưa có hủy'}</span>
                         </div>
                         <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -921,16 +927,16 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                    <div onClick={() => setRevenueDrill('profit')} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all group">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Lợi nhuận ước tính</h4>
-                        <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <svg className="w-4 h-4 text-emerald-500 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                       </div>
                       <p className="text-2xl font-bold text-gray-900">{formatVnd(estimatedProfit)}</p>
                       <div className="flex items-center gap-2 mt-2">
                         <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">Biên ~48%</span>
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">Từ {deliveredOrders.length} đơn hoàn thành</p>
+                      <p className="text-xs text-gray-400 mt-1">Từ {deliveredOrders.length} đơn hoàn thành · <span className="text-emerald-600 font-medium group-hover:underline">Xem chi tiết →</span></p>
                     </div>
                   </div>
                 </section>
@@ -2393,6 +2399,143 @@ export default function AdminDashboard() {
             </div>
           </>
         )}
+      </div>
+
+      {/* SLIDE-OVER: REVENUE DRILL-DOWN */}
+      <div className={`fixed top-0 right-0 h-full w-full max-w-[520px] bg-white shadow-2xl z-50 transform transition-transform duration-300 flex flex-col ${revenueDrill ? 'translate-x-0' : 'translate-x-full'}`}>
+        {revenueDrill && (() => {
+          const STATUS_VI: Record<string, string> = { pending: 'Chờ xử lý', producing: 'Đang sản xuất', issue: 'Tạm dừng', qc: 'Kiểm tra QC', shipping: 'Đang giao', delivered: 'Hoàn thành', cancelled: 'Đã hủy' };
+          const STATUS_COLOR: Record<string, string> = { pending: 'bg-gray-200 text-gray-700', producing: 'bg-blue-100 text-blue-700', issue: 'bg-purple-100 text-purple-700', qc: 'bg-green-100 text-green-700', shipping: 'bg-amber-100 text-amber-700', delivered: 'bg-emerald-100 text-emerald-700', cancelled: 'bg-red-100 text-red-700' };
+          const PAYMENT_BADGE: Record<string, { bg: string; label: string }> = { MOMO: { bg: 'bg-pink-100 text-pink-700', label: 'MoMo' }, VNPAY: { bg: 'bg-blue-100 text-blue-700', label: 'VNPay' }, COD: { bg: 'bg-orange-100 text-orange-700', label: 'COD' } };
+
+          const drillConfig = {
+            delivered: { title: 'Đã thu (hoàn thành)', icon: '✅', color: 'text-emerald-700', bgHeader: 'bg-emerald-50', getOrders: () => deliveredOrders },
+            active: { title: 'Đang xử lý', icon: '🔄', color: 'text-blue-700', bgHeader: 'bg-blue-50', getOrders: () => orders.filter(o => !['delivered', 'cancelled'].includes(o.status)) },
+            all: { title: 'Tổng doanh thu', icon: '📊', color: 'text-gray-900', bgHeader: 'bg-gray-50', getOrders: () => orders },
+            profit: { title: 'Lợi nhuận ước tính', icon: '💰', color: 'text-emerald-700', bgHeader: 'bg-emerald-50', getOrders: () => deliveredOrders },
+          };
+          const cfg = drillConfig[revenueDrill];
+          const drillOrders = cfg.getOrders();
+          const search = revenueDrillSearch.toLowerCase().trim();
+          const filtered = search ? drillOrders.filter(o =>
+            o.id.toLowerCase().includes(search) ||
+            o.name.toLowerCase().includes(search) ||
+            o.items.toLowerCase().includes(search) ||
+            o.price.toLowerCase().includes(search)
+          ) : drillOrders;
+
+          const totalFiltered = filtered.reduce((s, o) => s + parsePrice(o.price), 0);
+          const isProfit = revenueDrill === 'profit';
+
+          return (
+            <>
+              <div className={`px-6 py-4 border-b border-gray-200 ${cfg.bgHeader} shrink-0`}>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm text-gray-500 font-medium">Chi tiết doanh thu</p>
+                    <h2 className={`text-xl font-bold ${cfg.color} flex items-center gap-2`}>
+                      <span>{cfg.icon}</span> {cfg.title}
+                    </h2>
+                    <p className={`text-2xl font-bold mt-1 ${cfg.color}`}>
+                      {isProfit ? formatVnd(Math.round(totalFiltered * PROFIT_MARGIN)) : formatVnd(totalFiltered)}
+                      {isProfit && <span className="text-sm font-normal text-gray-500 ml-2">(từ {formatVnd(totalFiltered)} doanh thu)</span>}
+                    </p>
+                  </div>
+                  <button onClick={closeAllModals} className="p-2 text-gray-400 hover:bg-white hover:text-gray-600 rounded-full h-fit transition-colors">✕</button>
+                </div>
+                {/* Search bar */}
+                <div className="mt-3 relative">
+                  <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                  <input
+                    type="text"
+                    placeholder="Tìm theo mã đơn, tên khách, sản phẩm..."
+                    value={revenueDrillSearch}
+                    onChange={(e) => setRevenueDrillSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
+                  />
+                  {revenueDrillSearch && (
+                    <button onClick={() => setRevenueDrillSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">{filtered.length} đơn hàng {search ? `(lọc từ ${drillOrders.length})` : ''}</p>
+              </div>
+
+              <div className="flex-1 overflow-y-auto">
+                {filtered.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-400 p-6">
+                    <svg className="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <p className="font-medium">Không tìm thấy đơn hàng</p>
+                    <p className="text-xs mt-1">Thử từ khóa khác</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {filtered.map((order, idx) => {
+                      const price = parsePrice(order.price);
+                      const profit = Math.round(price * PROFIT_MARGIN);
+                      const pm = PAYMENT_BADGE[order.paymentMethod] || { bg: 'bg-gray-100 text-gray-600', label: order.paymentMethod };
+                      return (
+                        <div
+                          key={order.id}
+                          className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                          onClick={() => {
+                            const col = COLUMNS.find(c => c.id === order.status);
+                            setRevenueDrill(null);
+                            setRevenueDrillSearch('');
+                            setOrderModal({ ...order, uiStatus: col?.title || order.status });
+                          }}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-sm shrink-0">
+                              {order.avatar}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="font-bold text-gray-900 text-sm truncate">{order.name}</p>
+                                <span className="font-bold text-sm text-red-600 whitespace-nowrap">{order.price}</span>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-0.5 truncate">{order.items}</p>
+                              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                <span className="text-[10px] font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{order.id}</span>
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${STATUS_COLOR[order.status] || 'bg-gray-100 text-gray-600'}`}>
+                                  {STATUS_VI[order.status] || order.status}
+                                </span>
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${pm.bg}`}>{pm.label}</span>
+                                {isProfit && (
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
+                                    LN: {formatVnd(profit)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <svg className="w-4 h-4 text-gray-300 shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer tổng kết */}
+              <div className={`px-6 py-3 border-t border-gray-200 ${cfg.bgHeader} shrink-0`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500">{isProfit ? 'Tổng lợi nhuận' : 'Tổng doanh thu'} ({filtered.length} đơn)</p>
+                    <p className={`text-lg font-bold ${cfg.color}`}>
+                      {isProfit ? formatVnd(Math.round(totalFiltered * PROFIT_MARGIN)) : formatVnd(totalFiltered)}
+                    </p>
+                  </div>
+                  {isProfit && (
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500">Doanh thu gốc</p>
+                      <p className="text-sm font-bold text-gray-700">{formatVnd(totalFiltered)}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          );
+        })()}
       </div>
 
     </div>
