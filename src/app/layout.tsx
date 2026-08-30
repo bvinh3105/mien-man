@@ -1,11 +1,50 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/lib/auth";
 import { CartProvider } from "@/lib/cart";
 import "./globals.css";
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#F5F1EB' },
+    { media: '(prefers-color-scheme: dark)', color: '#2D2D2D' },
+  ],
+};
+
 export const metadata: Metadata = {
-  title: "Miên Man",
-  description: "Miên Man - Thêu tay thủ công lên tranh, quần áo, túi và kit DIY tự thêu",
+  title: {
+    default: 'Miên Man — Thêu tay thủ công',
+    template: '%s | Miên Man',
+  },
+  description: 'Thêu tay thủ công lên tranh, quần áo, túi — hoặc tự tay thêu với bộ kit DIY của Miên Man',
+  keywords: ['thêu tay', 'handmade', 'thêu thủ công', 'tranh thêu', 'kit DIY', 'miên man'],
+  authors: [{ name: 'Miên Man' }],
+  creator: 'Miên Man',
+  metadataBase: new URL('https://mien-man.pages.dev'),
+  openGraph: {
+    type: 'website',
+    locale: 'vi_VN',
+    siteName: 'Miên Man',
+    title: 'Miên Man — Thêu tay thủ công',
+    description: 'Mỗi mũi thêu, một câu chuyện riêng. Thêu tay thủ công lên tranh, quần áo và túi.',
+  },
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/icon-192.png',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Miên Man',
+  },
+  formatDetection: {
+    telephone: true,
+    email: true,
+  },
 };
 
 export default function RootLayout({
