@@ -91,31 +91,31 @@ const STAFF = [
 
 const INITIAL_ORDERS = [
   // === CHỜ XỬ LÝ === (chờ admin duyệt/phân công)
-  { id: 'MM-0042', status: 'pending', color: 'gray', name: 'Khánh Huyền', price: '700.000đ', paymentMethod: 'COD', time: '2 phút trước', items: 'Túi Tote Hoa Cúc (x2)', avatar: 'KH', assignee: null as typeof STAFF[number] | null },
-  { id: 'MM-0043', status: 'pending', color: 'gray', name: 'An Nguyễn', price: '250.000đ', paymentMethod: 'MOMO', time: '1 giờ trước', items: 'Mũ Bucket Custom', avatar: 'AN', urgent: true, assignee: null as typeof STAFF[number] | null },
-  { id: 'MM-0044', status: 'pending', color: 'gray', name: 'Trần Thảo Vy', price: '890.000đ', paymentMethod: 'VNPAY', time: '20 phút trước', items: 'Tranh thêu hoa sen', avatar: 'TV', assignee: null as typeof STAFF[number] | null, hasCustomDesign: true },
+  { id: 'MM-0042', status: 'pending', color: 'gray', name: 'Khánh Huyền', price: '700.000đ', paymentMethod: 'COD', time: '2 phút trước', items: 'Túi Tote Hoa Cúc (x2)', avatar: 'KH', assignee: null as typeof STAFF[number] | null, createdAt: '2026-08-30' },
+  { id: 'MM-0043', status: 'pending', color: 'gray', name: 'An Nguyễn', price: '250.000đ', paymentMethod: 'MOMO', time: '1 giờ trước', items: 'Mũ Bucket Custom', avatar: 'AN', urgent: true, assignee: null as typeof STAFF[number] | null, createdAt: '2026-08-30' },
+  { id: 'MM-0044', status: 'pending', color: 'gray', name: 'Trần Thảo Vy', price: '890.000đ', paymentMethod: 'VNPAY', time: '20 phút trước', items: 'Tranh thêu hoa sen', avatar: 'TV', assignee: null as typeof STAFF[number] | null, hasCustomDesign: true, createdAt: '2026-08-30' },
 
   // === ĐANG SẢN XUẤT === (thợ đang thêu)
-  { id: 'MM-0038', status: 'producing', color: 'blue', name: 'Thảo Lê', price: '1.200.000đ', paymentMethod: 'VNPAY', time: 'Hôm qua', items: 'Vỏ gối Linen (x5)', avatar: 'TL', progress: 60, machine: 'Máy #02', assignee: STAFF[0] },
-  { id: 'MM-0039', status: 'producing', color: 'blue', name: 'Ngọc Hà', price: '520.000đ', paymentMethod: 'MOMO', time: '2 ngày trước', items: 'Khăn Thêu Chữ Nghệ Thuật', avatar: 'NH', progress: 30, machine: 'Bàn thêu tay', assignee: STAFF[1] },
+  { id: 'MM-0038', status: 'producing', color: 'blue', name: 'Thảo Lê', price: '1.200.000đ', paymentMethod: 'VNPAY', time: 'Hôm qua', items: 'Vỏ gối Linen (x5)', avatar: 'TL', progress: 60, machine: 'Máy #02', assignee: STAFF[0], createdAt: '2026-08-29' },
+  { id: 'MM-0039', status: 'producing', color: 'blue', name: 'Ngọc Hà', price: '520.000đ', paymentMethod: 'MOMO', time: '2 ngày trước', items: 'Khăn Thêu Chữ Nghệ Thuật', avatar: 'NH', progress: 30, machine: 'Bàn thêu tay', assignee: STAFF[1], createdAt: '2026-08-28' },
 
   // === TẠM DỪNG === (có vấn đề)
-  { id: 'MM-0040', status: 'issue', color: 'purple', name: 'Bảo Trần', price: '350.000đ', paymentMethod: 'COD', time: '2 ngày trước', items: 'Túi Canvas Custom', avatar: 'BT', note: 'Hết chỉ đỏ mã #42R', assignee: STAFF[1] },
+  { id: 'MM-0040', status: 'issue', color: 'purple', name: 'Bảo Trần', price: '350.000đ', paymentMethod: 'COD', time: '2 ngày trước', items: 'Túi Canvas Custom', avatar: 'BT', note: 'Hết chỉ đỏ mã #42R', assignee: STAFF[1], createdAt: '2026-08-28' },
 
   // === KIỂM TRA QC === (đã thêu xong, chờ QC)
-  { id: 'MM-0037', status: 'qc', color: 'green', name: 'Minh Đức', price: '450.000đ', paymentMethod: 'VNPAY', time: '3 giờ trước', items: 'Áo Phông Thêu Logo (x2)', avatar: 'MĐ', assignee: STAFF[2], qcStep: 'Kiểm đường chỉ' },
-  { id: 'MM-0036', status: 'qc', color: 'green', name: 'Hồng Yến', price: '760.000đ', paymentMethod: 'MOMO', time: '5 giờ trước', items: 'Bộ tự thêu hoa cúc (x3)', avatar: 'HY', assignee: STAFF[2], qcStep: 'Đóng gói' },
+  { id: 'MM-0037', status: 'qc', color: 'green', name: 'Minh Đức', price: '450.000đ', paymentMethod: 'VNPAY', time: '3 giờ trước', items: 'Áo Phông Thêu Logo (x2)', avatar: 'MĐ', assignee: STAFF[2], qcStep: 'Kiểm đường chỉ', createdAt: '2026-08-30' },
+  { id: 'MM-0036', status: 'qc', color: 'green', name: 'Hồng Yến', price: '760.000đ', paymentMethod: 'MOMO', time: '5 giờ trước', items: 'Bộ tự thêu hoa cúc (x3)', avatar: 'HY', assignee: STAFF[2], qcStep: 'Đóng gói', createdAt: '2026-08-30' },
 
   // === ĐANG GIAO === (đã bàn giao đơn vị vận chuyển)
-  { id: 'MM-0034', status: 'shipping', color: 'amber', name: 'Phương Anh', price: '580.000đ', paymentMethod: 'COD', time: '1 ngày trước', items: 'Thêu tên áo phông (x3)', avatar: 'PA', assignee: STAFF[2], shipper: 'GHN', trackingNo: 'GHN2612345' },
-  { id: 'MM-0032', status: 'shipping', color: 'amber', name: 'Diệu Anh', price: '1.020.000đ', paymentMethod: 'VNPAY', time: '2 ngày trước', items: 'Thêu logo đồng phục (x5)', avatar: 'DA', assignee: STAFF[0], shipper: 'GHTK', trackingNo: 'GHTK8899123' },
+  { id: 'MM-0034', status: 'shipping', color: 'amber', name: 'Phương Anh', price: '580.000đ', paymentMethod: 'COD', time: '1 ngày trước', items: 'Thêu tên áo phông (x3)', avatar: 'PA', assignee: STAFF[2], shipper: 'GHN', trackingNo: 'GHN2612345', createdAt: '2026-08-29' },
+  { id: 'MM-0032', status: 'shipping', color: 'amber', name: 'Diệu Anh', price: '1.020.000đ', paymentMethod: 'VNPAY', time: '2 ngày trước', items: 'Thêu logo đồng phục (x5)', avatar: 'DA', assignee: STAFF[0], shipper: 'GHTK', trackingNo: 'GHTK8899123', createdAt: '2026-08-28' },
 
   // === HOÀN THÀNH === (khách đã nhận)
-  { id: 'MM-0035', status: 'delivered', color: 'emerald', name: 'Minh Tú', price: '350.000đ', paymentMethod: 'MOMO', time: '3 ngày trước', items: 'Tote Cúc Họa Mi', avatar: 'MT', assignee: STAFF[0], rating: 5, completedAt: '25/08/2026' },
-  { id: 'MM-0030', status: 'delivered', color: 'emerald', name: 'Hà Anh', price: '890.000đ', paymentMethod: 'VNPAY', time: '5 ngày trước', items: 'Tranh phong cảnh làng quê', avatar: 'HA', assignee: STAFF[1], rating: 4, completedAt: '23/08/2026' },
+  { id: 'MM-0035', status: 'delivered', color: 'emerald', name: 'Minh Tú', price: '350.000đ', paymentMethod: 'MOMO', time: '3 ngày trước', items: 'Tote Cúc Họa Mi', avatar: 'MT', assignee: STAFF[0], rating: 5, completedAt: '25/08/2026', createdAt: '2026-08-27' },
+  { id: 'MM-0030', status: 'delivered', color: 'emerald', name: 'Hà Anh', price: '890.000đ', paymentMethod: 'VNPAY', time: '5 ngày trước', items: 'Tranh phong cảnh làng quê', avatar: 'HA', assignee: STAFF[1], rating: 4, completedAt: '23/08/2026', createdAt: '2026-08-25' },
 
   // === ĐÃ HỦY === (đơn bị hủy)
-  { id: 'MM-0041', status: 'cancelled', color: 'red', name: 'Thu Trang', price: '280.000đ', paymentMethod: 'COD', time: '1 ngày trước', items: 'Khăn thêu chữ', avatar: 'TT', cancelReason: 'Khách đổi ý trước SX', assignee: null as typeof STAFF[number] | null, cancelledAt: '27/08/2026' },
+  { id: 'MM-0041', status: 'cancelled', color: 'red', name: 'Thu Trang', price: '280.000đ', paymentMethod: 'COD', time: '1 ngày trước', items: 'Khăn thêu chữ', avatar: 'TT', cancelReason: 'Khách đổi ý trước SX', assignee: null as typeof STAFF[number] | null, cancelledAt: '27/08/2026', createdAt: '2026-08-29' },
 ];
 
 // --- LỊCH SỬ ĐƠN HÀNG (đã hoàn thành / hủy / hoàn) ---
@@ -384,6 +384,7 @@ export default function AdminDashboard() {
   // Revenue drill-down: click vào card doanh thu → xem chi tiết đơn
   const [revenueDrill, setRevenueDrill] = useState<'delivered' | 'active' | 'all' | 'profit' | null>(null);
   const [revenueDrillSearch, setRevenueDrillSearch] = useState('');
+  const [revenuePeriod, setRevenuePeriod] = useState<'today' | '7days' | 'month' | 'all'>('all');
 
   const closeAllModals = () => {
     setOrderModal(null);
@@ -522,6 +523,7 @@ export default function AdminDashboard() {
           items: o.note || 'Đơn hàng',
           avatar: (o.guest_name ?? 'KH').substring(0, 2).toUpperCase(),
           assignee: null,
+          createdAt: o.created_at ? new Date(o.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
         }));
         setOrders(mapped);
       } catch {
@@ -547,6 +549,7 @@ export default function AdminDashboard() {
           items: o.note || 'Đơn hàng mới',
           avatar: (o.guest_name ?? 'KH').substring(0, 2).toUpperCase(),
           assignee: null,
+          createdAt: (o.created_at ? new Date(o.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)),
         }, ...prev]);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload: any) => {
@@ -580,11 +583,37 @@ export default function AdminDashboard() {
     return parseInt(p.replace(/[^\d]/g, ''), 10) || 0;
   }
 
-  // Doanh thu computed — tính realtime từ orders state
+  // Doanh thu computed — tính realtime từ orders state (ALL-TIME, dùng cho Section B, summary)
   const revenueDelivered = deliveredOrders.reduce((s, o) => s + parsePrice(o.price), 0);
   const revenueAll = orders.reduce((s, o) => s + parsePrice(o.price), 0);
   const revenueActive = orders.filter(o => !['delivered', 'cancelled'].includes(o.status)).reduce((s, o) => s + parsePrice(o.price), 0);
   const revenuePending = pendingOrders.reduce((s, o) => s + parsePrice(o.price), 0);
+
+  // ─── Period filter cho Section A Revenue Cards ──────────
+  const filterByPeriod = (list: typeof orders) => {
+    if (revenuePeriod === 'all') return list;
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+    if (revenuePeriod === 'today') return list.filter(o => (o.createdAt || '') === todayStr);
+    if (revenuePeriod === '7days') {
+      const d7 = new Date(now); d7.setDate(d7.getDate() - 6); // 7 ngày rolling (hôm nay + 6 ngày trước)
+      const d7Str = d7.toISOString().slice(0, 10);
+      return list.filter(o => (o.createdAt || '') >= d7Str);
+    }
+    // 'month' — tháng này
+    const monthPrefix = todayStr.slice(0, 7); // 'YYYY-MM'
+    return list.filter(o => (o.createdAt || '').startsWith(monthPrefix));
+  };
+  const PERIOD_LABELS: Record<string, string> = { today: 'Hôm nay', '7days': '7 ngày', month: 'Tháng này', all: 'Tất cả' };
+
+  // Period-filtered orders (cho Section A revenue cards + drill-down)
+  const pOrders = filterByPeriod(orders);
+  const pDelivered = pOrders.filter(o => o.status === 'delivered');
+  const pCancelled = pOrders.filter(o => o.status === 'cancelled');
+  const pActive = pOrders.filter(o => !['delivered', 'cancelled'].includes(o.status));
+  const pRevenueDelivered = pDelivered.reduce((s, o) => s + parsePrice(o.price), 0);
+  const pRevenueAll = pOrders.reduce((s, o) => s + parsePrice(o.price), 0);
+  const pRevenueActive = pActive.reduce((s, o) => s + parsePrice(o.price), 0);
 
   // --- DND KIT LOGIC ---
   const sensors = useSensors(
@@ -881,7 +910,7 @@ export default function AdminDashboard() {
             // Doanh thu computed realtime từ orders state
             const totalOrders = orders.length;
             const activeOrderCount = orders.filter(o => !['delivered', 'cancelled'].includes(o.status)).length;
-            const estimatedProfit = Math.round(revenueDelivered * PROFIT_MARGIN);
+            const pEstimatedProfit = Math.round(pRevenueDelivered * PROFIT_MARGIN);
             const chartData = revenueRange === '7' ? DAILY_REVENUE.slice(-7) : DAILY_REVENUE;
             const chartMax = Math.max(...chartData.map(d => d.revenue));
 
@@ -890,15 +919,28 @@ export default function AdminDashboard() {
 
                 {/* Section A: Doanh thu & Lợi nhuận — COMPUTED FROM ORDERS */}
                 <section>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">💰 Doanh thu &amp; Lợi nhuận <span className="text-[10px] font-normal text-emerald-600">(realtime từ đơn hàng)</span></h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">💰 Doanh thu &amp; Lợi nhuận <span className="text-[10px] font-normal text-emerald-600">(realtime từ đơn hàng)</span></h3>
+                    <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-0.5 shadow-sm">
+                      {(['today', '7days', 'month', 'all'] as const).map(p => (
+                        <button
+                          key={p}
+                          onClick={() => setRevenuePeriod(p)}
+                          className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-all ${revenuePeriod === p ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'}`}
+                        >
+                          {PERIOD_LABELS[p]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div onClick={() => setRevenueDrill('delivered')} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all group">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Đã thu (hoàn thành)</h4>
                         <svg className="w-4 h-4 text-emerald-500 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
                       </div>
-                      <p className="text-2xl font-bold text-emerald-700">{formatVnd(revenueDelivered)}</p>
-                      <p className="text-xs text-gray-400 mt-1">{deliveredOrders.length} đơn đã giao · <span className="text-emerald-600 font-medium group-hover:underline">Xem chi tiết →</span></p>
+                      <p className="text-2xl font-bold text-emerald-700">{formatVnd(pRevenueDelivered)}</p>
+                      <p className="text-xs text-gray-400 mt-1">{pDelivered.length} đơn đã giao · <span className="text-emerald-600 font-medium group-hover:underline">Xem chi tiết →</span></p>
                     </div>
 
                     <div onClick={() => setRevenueDrill('active')} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:shadow-md hover:border-blue-300 transition-all group">
@@ -906,8 +948,8 @@ export default function AdminDashboard() {
                         <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Đang xử lý</h4>
                         <svg className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">{formatVnd(revenueActive)}</p>
-                      <p className="text-xs text-gray-400 mt-1">{activeOrderCount} đơn đang xử lý · <span className="text-blue-600 font-medium group-hover:underline">Xem chi tiết →</span></p>
+                      <p className="text-2xl font-bold text-gray-900">{formatVnd(pRevenueActive)}</p>
+                      <p className="text-xs text-gray-400 mt-1">{pActive.length} đơn đang xử lý · <span className="text-blue-600 font-medium group-hover:underline">Xem chi tiết →</span></p>
                     </div>
 
                     <div onClick={() => setRevenueDrill('all')} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:shadow-md hover:border-gray-400 transition-all group">
@@ -915,14 +957,14 @@ export default function AdminDashboard() {
                         <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Tổng doanh thu</h4>
                         <svg className="w-4 h-4 text-emerald-500 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">{formatVnd(revenueAll)}</p>
+                      <p className="text-2xl font-bold text-gray-900">{formatVnd(pRevenueAll)}</p>
                       <div className="mt-2">
                         <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
-                          <span>{totalOrders} đơn tổng cộng · <span className="text-gray-600 font-medium group-hover:underline">Xem chi tiết →</span></span>
-                          <span className="font-bold text-gray-700">{cancelledOrders.length > 0 ? `${cancelledOrders.length} hủy` : 'Chưa có hủy'}</span>
+                          <span>{pOrders.length} đơn{revenuePeriod !== 'all' ? ` (${PERIOD_LABELS[revenuePeriod]})` : ' tổng cộng'} · <span className="text-gray-600 font-medium group-hover:underline">Xem chi tiết →</span></span>
+                          <span className="font-bold text-gray-700">{pCancelled.length > 0 ? `${pCancelled.length} hủy` : 'Chưa có hủy'}</span>
                         </div>
                         <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${totalOrders > 0 ? Math.round(deliveredOrders.length / totalOrders * 100) : 0}%` }}></div>
+                          <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${pOrders.length > 0 ? Math.round(pDelivered.length / pOrders.length * 100) : 0}%` }}></div>
                         </div>
                       </div>
                     </div>
@@ -932,11 +974,11 @@ export default function AdminDashboard() {
                         <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Lợi nhuận ước tính</h4>
                         <svg className="w-4 h-4 text-emerald-500 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">{formatVnd(estimatedProfit)}</p>
+                      <p className="text-2xl font-bold text-gray-900">{formatVnd(pEstimatedProfit)}</p>
                       <div className="flex items-center gap-2 mt-2">
                         <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">Biên ~48%</span>
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">Từ {deliveredOrders.length} đơn hoàn thành · <span className="text-emerald-600 font-medium group-hover:underline">Xem chi tiết →</span></p>
+                      <p className="text-xs text-gray-400 mt-1">Từ {pDelivered.length} đơn hoàn thành · <span className="text-emerald-600 font-medium group-hover:underline">Xem chi tiết →</span></p>
                     </div>
                   </div>
                 </section>
@@ -2409,10 +2451,10 @@ export default function AdminDashboard() {
           const PAYMENT_BADGE: Record<string, { bg: string; label: string }> = { MOMO: { bg: 'bg-pink-100 text-pink-700', label: 'MoMo' }, VNPAY: { bg: 'bg-blue-100 text-blue-700', label: 'VNPay' }, COD: { bg: 'bg-orange-100 text-orange-700', label: 'COD' } };
 
           const drillConfig = {
-            delivered: { title: 'Đã thu (hoàn thành)', icon: '✅', color: 'text-emerald-700', bgHeader: 'bg-emerald-50', getOrders: () => deliveredOrders },
-            active: { title: 'Đang xử lý', icon: '🔄', color: 'text-blue-700', bgHeader: 'bg-blue-50', getOrders: () => orders.filter(o => !['delivered', 'cancelled'].includes(o.status)) },
-            all: { title: 'Tổng doanh thu', icon: '📊', color: 'text-gray-900', bgHeader: 'bg-gray-50', getOrders: () => orders },
-            profit: { title: 'Lợi nhuận ước tính', icon: '💰', color: 'text-emerald-700', bgHeader: 'bg-emerald-50', getOrders: () => deliveredOrders },
+            delivered: { title: 'Đã thu (hoàn thành)', icon: '✅', color: 'text-emerald-700', bgHeader: 'bg-emerald-50', getOrders: () => pDelivered },
+            active: { title: 'Đang xử lý', icon: '🔄', color: 'text-blue-700', bgHeader: 'bg-blue-50', getOrders: () => pActive },
+            all: { title: 'Tổng doanh thu', icon: '📊', color: 'text-gray-900', bgHeader: 'bg-gray-50', getOrders: () => pOrders },
+            profit: { title: 'Lợi nhuận ước tính', icon: '💰', color: 'text-emerald-700', bgHeader: 'bg-emerald-50', getOrders: () => pDelivered },
           };
           const cfg = drillConfig[revenueDrill];
           const drillOrders = cfg.getOrders();
@@ -2432,7 +2474,7 @@ export default function AdminDashboard() {
               <div className={`px-6 py-4 border-b border-gray-200 ${cfg.bgHeader} shrink-0`}>
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-sm text-gray-500 font-medium">Chi tiết doanh thu</p>
+                    <p className="text-sm text-gray-500 font-medium">Chi tiết doanh thu {revenuePeriod !== 'all' && <span className="inline-block ml-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">{PERIOD_LABELS[revenuePeriod]}</span>}</p>
                     <h2 className={`text-xl font-bold ${cfg.color} flex items-center gap-2`}>
                       <span>{cfg.icon}</span> {cfg.title}
                     </h2>
