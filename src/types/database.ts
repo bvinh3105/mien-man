@@ -180,26 +180,37 @@ export interface Database {
         Row: {
           id: string;
           order_number: string;
-          user_id: string;
+          user_id: string | null;
           address_id: string | null;
           status: OrderStatus;
           total_amount: number;
           shipping_fee: number;
           discount: number;
           note: string;
+          // Guest fields (null nếu là user đăng nhập)
+          guest_name: string | null;
+          guest_phone: string | null;
+          guest_email: string | null;
+          guest_address: GuestAddress | null;
+          payment_method: PaymentMethod;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
           order_number?: string;
-          user_id: string;
+          user_id?: string | null;
           address_id?: string | null;
           status?: OrderStatus;
           total_amount: number;
           shipping_fee?: number;
           discount?: number;
           note?: string;
+          guest_name?: string | null;
+          guest_phone?: string | null;
+          guest_email?: string | null;
+          guest_address?: GuestAddress | null;
+          payment_method?: PaymentMethod;
         };
         Update: {
           address_id?: string | null;
@@ -208,6 +219,11 @@ export interface Database {
           shipping_fee?: number;
           discount?: number;
           note?: string;
+          guest_name?: string | null;
+          guest_phone?: string | null;
+          guest_email?: string | null;
+          guest_address?: GuestAddress | null;
+          payment_method?: PaymentMethod;
         };
       };
       order_items: {
@@ -311,6 +327,16 @@ export interface Database {
       };
     };
   };
+}
+
+// ============================================================
+// Guest address shape (lưu trong JSONB)
+// ============================================================
+export interface GuestAddress {
+  street: string;
+  ward?: string;
+  district: string;
+  province: string;
 }
 
 // ============================================================

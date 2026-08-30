@@ -122,15 +122,24 @@ create type order_status as enum (
 create table public.orders (
   id              uuid primary key default uuid_generate_v4(),
   order_number    text not null unique,
-  user_id         uuid not null references public.profiles(id),
+  user_id         uuid references public.profiles(id),      -- NULL cho khách vãng lai
   address_id      uuid references public.addresses(id),
   status          order_status not null default 'pending',
   total_amount    int not null default 0,
   shipping_fee    int not null default 0,
   discount        int not null default 0,
   note            text default '',
+  -- Guest checkout fields
+  guest_name      text default null,
+  guest_phone     text default null,
+  guest_email     text default null,
+  guest_address   jsonb default null,
+  payment_method  text not null default 'cod'
+    check (payment_method in ('cod', 'bank_transfer', 'momo', 'vnpay')),
   created_at      timestamptz not null default now(),
-  updated_at      timestamptz not null default now()
+  updated_at      timestamptz not null default now(),
+  -- Bảo toàn: phải có user_id HOẶC guest_phone
+  constraint orders_identity_check check (user_id is not null or guest_phone is not null)
 );
 
 create index idx_orders_user on public.orders(user_id);
@@ -302,6 +311,14 @@ create policy "Users read own orders"
 
 create policy "Users create own orders"
   on public.orders for insert with check (auth.uid() = user_id);
+
+create policy "Guest insert order"
+  on public.orders for insert to anon
+  with check (user_id is null and guest_phone is not null);
+
+create policy "Guest track own order"
+  on public.orders for select to anon
+  using (user_id is null);
 
 create policy "Admin read all orders"
   on public.orders for select using (

@@ -1,5 +1,7 @@
 import { categories, products } from "@/lib/data";
 import Link from "next/link";
+import CartBar from "@/components/CartBar";
+import AddToCartButton from "@/components/AddToCartButton";
 
 function formatVND(price: number) {
   return price.toLocaleString("vi-VN") + "đ";
@@ -85,15 +87,20 @@ export default function HomePage() {
               </Link>
             ))}
           </nav>
-          <div className="flex items-center gap-3">
-            <Link href="/admin" className="text-sm text-sage-500 hover:text-charcoal transition hidden sm:inline-flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            <Link href="/track" className="text-xs text-sage-500 hover:text-charcoal transition hidden sm:inline-flex items-center gap-1 px-3 py-2 rounded-full hover:bg-sage-50">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+              Tra cứu đơn
+            </Link>
+            <Link href="/admin" className="text-xs text-sage-500 hover:text-charcoal transition hidden sm:inline-flex items-center gap-1 px-3 py-2 rounded-full hover:bg-sage-50">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
               Admin
             </Link>
-            <Link href="/login" className="text-sm text-sage-700 hover:text-charcoal border border-sage-200 rounded-full px-5 py-2 transition hidden sm:inline-block">
+            <CartBar />
+            <Link href="/login" className="text-sm text-sage-700 hover:text-charcoal border border-sage-200 rounded-full px-4 py-2 transition hidden sm:inline-block">
               Đăng nhập
             </Link>
-            <Link href="/register" className="text-sm bg-sage-500 text-white rounded-full px-5 py-2 hover:bg-sage-600 transition font-medium">
+            <Link href="/register" className="text-sm bg-sage-500 text-white rounded-full px-4 py-2 hover:bg-sage-600 transition font-medium hidden sm:inline-block">
               Đăng ký
             </Link>
           </div>
@@ -315,27 +322,44 @@ export default function HomePage() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {products.map((product) => (
-            <Link key={product.id} href={`/product/${product.slug}`} className="bg-white rounded-xl overflow-hidden border border-sage-100 hover:shadow-lg transition group">
-              <div className="aspect-[3/4] bg-sage-50 relative overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={placeholderFor(product.slug)} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
-                {product.salePrice && (
-                  <span className="absolute top-2 left-2 bg-sage-700 text-white text-[10px] px-2.5 py-1 rounded-full font-medium">
-                    -{Math.round((1 - product.salePrice / product.price) * 100)}%
-                  </span>
-                )}
-              </div>
-              <div className="p-3">
-                <p className="text-[10px] text-sage-400 uppercase tracking-wider mb-1">{product.category?.name}</p>
-                <h3 className="text-sm font-medium text-charcoal line-clamp-2 mb-2">{product.name}</h3>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-sage-700">{formatVND(product.salePrice || product.price)}</span>
+            <div key={product.id} className="bg-white rounded-xl overflow-hidden border border-sage-100 hover:shadow-lg transition group relative">
+              <Link href={`/product/${product.slug}`} className="block">
+                <div className="aspect-[3/4] bg-sage-50 relative overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={placeholderFor(product.slug)} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
                   {product.salePrice && (
-                    <span className="text-xs text-sage-300 line-through">{formatVND(product.price)}</span>
+                    <span className="absolute top-2 left-2 bg-sage-700 text-white text-[10px] px-2.5 py-1 rounded-full font-medium">
+                      -{Math.round((1 - product.salePrice / product.price) * 100)}%
+                    </span>
                   )}
                 </div>
+                <div className="p-3 pb-1">
+                  <p className="text-[10px] text-sage-400 uppercase tracking-wider mb-1">{product.category?.name}</p>
+                  <h3 className="text-sm font-medium text-charcoal line-clamp-2 mb-2">{product.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-sage-700">{formatVND(product.salePrice || product.price)}</span>
+                    {product.salePrice && (
+                      <span className="text-xs text-sage-300 line-through">{formatVND(product.price)}</span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+              {/* Nút thêm vào giỏ — absolute để không navigate */}
+              <div className="p-3 pt-2 flex items-center justify-between">
+                <span className="text-[10px] text-sage-400">{product.stock > 0 ? `Còn ${product.stock}` : "Đặt trước"}</span>
+                <AddToCartButton
+                  compact
+                  product={{
+                    productId: product.id,
+                    name: product.name,
+                    price: product.salePrice ?? product.price,
+                    originalPrice: product.price,
+                    image: placeholderFor(product.slug),
+                    slug: product.slug,
+                  }}
+                />
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       </section>

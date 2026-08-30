@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { getSupabase } from '@/lib/supabase';
 import Link from 'next/link';
 // import AdminGuard from '@/components/AdminGuard'; // TODO: bật lại khi deploy
 import {
@@ -451,6 +452,120 @@ export default function AdminDashboard() {
 
   const hasAnyModalOpen = !!orderModal || !!productModal || !!customerModal;
 
+  // ─── Map local status ↔ DB status ──────────────────────
+  const LOCAL_TO_DB: Record<string, string> = {
+    pending:   'pending',
+    producing: 'in_progress',
+    issue:     'error',
+    qc:        'quality_check',
+    shipping:  'shipped',
+    delivered: 'delivered',
+    cancelled: 'cancelled',
+  };
+  const DB_TO_LOCAL: Record<string, string> = {
+    pending:       'pending',
+    confirmed:     'pending',    // confirmed → hiện trong cột pending
+    in_progress:   'producing',
+    error:         'issue',
+    quality_check: 'qc',
+    ready_to_ship: 'shipping',   // ready_to_ship → shipping
+    shipped:       'shipping',
+    delivered:     'delivered',
+    cancelled:     'cancelled',
+  };
+
+  // ─── Supabase Realtime subscription ─────────────────────
+  // Lazy: chỉ khởi tạo client-side bên trong useEffect / handlers
+  const channelRef = useRef<any>(null);
+
+  // Helper an toàn: trả về null nếu chưa configure (tránh throw lúc SSG)
+  function getClient() {
+    try { return getSupabase() as any; } catch { return null; }
+  }
+
+  useEffect(() => {
+    const supabase = getClient();
+    if (!supabase) return; // Supabase chưa config → bỏ qua, dùng mock data
+
+    // 1. Fetch initial live orders
+    async function fetchOrders() {
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('id, order_number, status, total_amount, created_at, guest_name, guest_phone, payment_method, note')
+          .not('status', 'in', '(delivered,cancelled)')
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (error || !data || data.length === 0) return; // fallback mock
+
+        const colorFor = (s: string) =>
+          s === 'pending' ? 'gray' : s === 'producing' ? 'blue' : s === 'issue' ? 'purple' :
+          s === 'qc' ? 'green' : s === 'shipping' ? 'amber' : s === 'delivered' ? 'emerald' :
+          s === 'cancelled' ? 'red' : 'gray';
+
+        const mapped = data.map((o: any) => ({
+          id: o.id,
+          status: DB_TO_LOCAL[o.status] ?? o.status,
+          color: colorFor(DB_TO_LOCAL[o.status] ?? o.status),
+          name: o.guest_name ?? 'Khách hàng',
+          price: (o.total_amount ?? 0).toLocaleString('vi-VN') + 'đ',
+          paymentMethod: (o.payment_method ?? 'cod').toUpperCase(),
+          time: new Date(o.created_at).toLocaleString('vi-VN'),
+          items: o.note || 'Đơn hàng',
+          avatar: (o.guest_name ?? 'KH').substring(0, 2).toUpperCase(),
+          assignee: null,
+        }));
+        setOrders(mapped);
+      } catch {
+        // Supabase offline → giữ mock data
+      }
+    }
+    fetchOrders();
+
+    // 2. Subscribe realtime
+    const channel = supabase.channel('admin-kanban')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload: any) => {
+        const o = payload.new as any;
+        const localStatus = DB_TO_LOCAL[o.status] ?? 'pending';
+        const colorFor = (s: string) => s === 'pending' ? 'gray' : s === 'producing' ? 'blue' : s === 'issue' ? 'purple' : s === 'qc' ? 'green' : s === 'shipping' ? 'amber' : s === 'delivered' ? 'emerald' : s === 'cancelled' ? 'red' : 'gray';
+        setOrders(prev => [{
+          id: o.id,
+          status: localStatus,
+          color: colorFor(localStatus),
+          name: o.guest_name ?? 'Khách hàng',
+          price: (o.total_amount ?? 0).toLocaleString('vi-VN') + 'đ',
+          paymentMethod: (o.payment_method ?? 'cod').toUpperCase(),
+          time: 'Vừa xong',
+          items: o.note || 'Đơn hàng mới',
+          avatar: (o.guest_name ?? 'KH').substring(0, 2).toUpperCase(),
+          assignee: null,
+        }, ...prev]);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload: any) => {
+        const o = payload.new as any;
+        const localStatus = DB_TO_LOCAL[o.status] ?? o.status;
+        const colorFor = (s: string) => s === 'pending' ? 'gray' : s === 'producing' ? 'blue' : s === 'issue' ? 'purple' : s === 'qc' ? 'green' : s === 'shipping' ? 'amber' : s === 'delivered' ? 'emerald' : s === 'cancelled' ? 'red' : 'gray';
+        setOrders(prev => prev.map(existing =>
+          existing.id === o.id
+            ? { ...existing, status: localStatus, color: colorFor(localStatus) }
+            : existing
+        ));
+      })
+      .subscribe();
+
+    channelRef.current = channel;
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─── Computed stats từ orders thật ──────────────────────
+  const pendingOrders   = orders.filter(o => o.status === 'pending');
+  const producingOrders = orders.filter(o => o.status === 'producing');
+  const issueOrders     = orders.filter(o => o.status === 'issue');
+  const qcOrders        = orders.filter(o => o.status === 'qc');
+  const shippingOrders  = orders.filter(o => o.status === 'shipping');
+
   // --- DND KIT LOGIC ---
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -532,17 +647,38 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     setActiveId(null);
-    const { active, over } = event;
-    if (!over) return;
+    const { active } = event;
+    if (!active) return;
 
-    const activeId = active.id;
-    const overId = over.id;
-    if (activeId === overId) return;
+    // Lấy status hiện tại của order sau khi handleDragOver đã cập nhật
+    const order = orders.find(o => o.id === active.id);
+    if (!order) return;
 
-    // Logic thay đổi thứ tự đã được xử lý ở onDragOver, onDragEnd chỉ để gọi API nếu cần
-    // Ví dụ: supabase.from('orders').update({ status: orders.find(o => o.id === activeId).status }).eq('id', activeId)
+    const dbStatus = LOCAL_TO_DB[order.status];
+    if (!dbStatus) return;
+
+    // Kiểm tra ID có phải UUID không (mock data dùng MM-XXXX)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(order.id);
+    if (!isUuid) return; // Skip mock data
+
+    const supabase = getClient();
+    if (!supabase) return;
+
+    try {
+      // Cập nhật DB
+      await supabase.from('orders').update({ status: dbStatus }).eq('id', order.id);
+      // Ghi log order_history
+      await supabase.from('order_history').insert({
+        order_id: order.id,
+        to_status: dbStatus,
+        note: `Chuyển cột Kanban → ${dbStatus}`,
+      });
+    } catch {
+      // Nếu lỗi → thông báo nhẹ (không revert UI để không giật)
+      console.error('Realtime update failed for order', order.id);
+    }
   };
 
   const getActiveOrder = () => {
@@ -576,7 +712,7 @@ export default function AdminDashboard() {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
               Đơn hàng
             </span>
-            <span className="text-[10px] font-bold bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">{orders.length}</span>
+            <span className="text-[10px] font-bold bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">{pendingOrders.length + producingOrders.length + issueOrders.length + qcOrders.length + shippingOrders.length}</span>
           </button>
           <button
             onClick={() => setActiveTab('products')}
@@ -814,21 +950,32 @@ export default function AdminDashboard() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                       <h4 className="text-xs font-medium text-gray-500 mb-1">Đơn đang xử lý</h4>
-                      <p className="text-2xl font-bold text-gray-900">{orders.length} đơn</p>
+                      <p className="text-2xl font-bold text-gray-900">{pendingOrders.length + producingOrders.length + issueOrders.length + qcOrders.length + shippingOrders.length} đơn</p>
                       <div className="mt-3 space-y-1 text-xs text-gray-600">
-                        <div className="flex justify-between"><span>Chờ xử lý</span><span className="font-bold">2</span></div>
-                        <div className="flex justify-between"><span>Đang sản xuất</span><span className="font-bold text-blue-600">1</span></div>
-                        <div className="flex justify-between"><span>Tạm dừng</span><span className="font-bold text-purple-600">1</span></div>
+                        <div className="flex justify-between"><span>Chờ xử lý</span><span className="font-bold">{pendingOrders.length}</span></div>
+                        <div className="flex justify-between"><span>Đang sản xuất</span><span className="font-bold text-blue-600">{producingOrders.length}</span></div>
+                        <div className="flex justify-between"><span>Tạm dừng</span><span className="font-bold text-purple-600">{issueOrders.length}</span></div>
+                        <div className="flex justify-between"><span>Kiểm tra QC</span><span className="font-bold text-green-600">{qcOrders.length}</span></div>
+                        <div className="flex justify-between"><span>Đang giao</span><span className="font-bold text-amber-600">{shippingOrders.length}</span></div>
                       </div>
                       <button onClick={() => setActiveTab('orders')} className="mt-3 text-xs text-emerald-600 font-bold hover:underline">Xem Kanban →</button>
                     </div>
 
-                    <div className="bg-red-50 p-5 rounded-xl border border-red-200 shadow-sm">
-                      <h4 className="text-xs font-medium text-red-600 mb-1">⚠ Cần chú ý</h4>
-                      <p className="text-2xl font-bold text-red-700">1 đơn</p>
-                      <p className="text-xs text-red-600 mt-2">MM-0040 · Bảo Trần</p>
-                      <p className="text-xs text-red-500 mt-0.5">Tạm dừng — hết chỉ đỏ #42R</p>
-                      <button onClick={() => setActiveTab('orders')} className="mt-3 bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-md w-full">Xử lý ngay →</button>
+                    <div className={`p-5 rounded-xl border shadow-sm ${issueOrders.length > 0 ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                      <h4 className={`text-xs font-medium mb-1 ${issueOrders.length > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{issueOrders.length > 0 ? '⚠ Cần chú ý' : '✅ Vận hành ổn'}</h4>
+                      <p className={`text-2xl font-bold ${issueOrders.length > 0 ? 'text-red-700' : 'text-emerald-700'}`}>{issueOrders.length} đơn tạm dừng</p>
+                      {issueOrders.length > 0 ? (
+                        <>
+                          {issueOrders.slice(0, 2).map(o => (
+                            <div key={o.id} className="mt-1">
+                              <p className="text-xs text-red-600">{o.id} · {o.name}</p>
+                            </div>
+                          ))}
+                          <button onClick={() => setActiveTab('orders')} className="mt-3 bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-md w-full">Xử lý ngay →</button>
+                        </>
+                      ) : (
+                        <p className="text-xs text-emerald-600 mt-2">Không có đơn nào bị tạm dừng 🎉</p>
+                      )}
                     </div>
 
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">

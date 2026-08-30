@@ -1,0 +1,247 @@
+// ============================================================
+// Orders Service — tạo đơn hàng (guest + user) + tra cứu
+// ============================================================
+
+import { getSupabase as _getSupabase } from "./supabase";
+import type { CartItem } from "./cart";
+import type { GuestAddress, OrderStatus } from "@/types/database";
+
+// Cast để tránh strict Supabase generics (giống products.ts)
+function getSupabase() {
+  return _getSupabase() as unknown as { from: (table: string) => any };
+}
+
+export interface GuestInfo {
+  name: string;
+  phone: string;
+  email?: string;
+  address: GuestAddress;
+  note?: string;
+  paymentMethod?: "cod" | "bank_transfer";
+}
+
+export interface CreatedOrder {
+  id: string;
+  orderNumber: string;
+  totalAmount: number;
+  status: OrderStatus;
+}
+
+// ─── Tạo đơn hàng cho khách vãng lai ──────────────────────
+export async function createGuestOrder(
+  guest: GuestInfo,
+  cartItems: CartItem[]
+): Promise<CreatedOrder> {
+  if (cartItems.length === 0) throw new Error("Giỏ hàng trống");
+  if (!guest.name.trim()) throw new Error("Vui lòng nhập họ tên");
+  if (!guest.phone.trim()) throw new Error("Vui lòng nhập số điện thoại");
+  if (!guest.address.street) throw new Error("Vui lòng nhập địa chỉ");
+  if (!guest.address.district) throw new Error("Vui lòng nhập quận/huyện");
+  if (!guest.address.province) throw new Error("Vui lòng nhập tỉnh/thành");
+
+  const supabase = getSupabase();
+
+  const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
+  const shippingFee = subtotal >= 500000 ? 0 : 30000; // Miễn ship ≥ 500k
+  const totalAmount = subtotal + shippingFee;
+
+  // 1. Tạo order
+  const { data: order, error: orderErr } = await supabase
+    .from("orders")
+    .insert({
+      user_id: null,
+      guest_name: guest.name.trim(),
+      guest_phone: guest.phone.trim(),
+      guest_email: guest.email?.trim() || null,
+      guest_address: guest.address,
+      total_amount: totalAmount,
+      shipping_fee: shippingFee,
+      note: guest.note?.trim() || "",
+      payment_method: guest.paymentMethod ?? "cod",
+      status: "pending",
+    })
+    .select("id, order_number, total_amount, status")
+    .single();
+
+  if (orderErr) throw orderErr;
+  if (!order) throw new Error("Không tạo được đơn hàng");
+
+  // 2. Tạo order_items
+  const orderItems = cartItems.map((item) => ({
+    order_id: order.id,
+    product_id: item.productId,
+    variant_id: null,
+    quantity: item.quantity,
+    unit_price: item.price,
+    custom_options: {},
+  }));
+
+  const { error: itemsErr } = await supabase.from("order_items").insert(orderItems);
+  if (itemsErr) throw itemsErr;
+
+  return {
+    id: order.id,
+    orderNumber: order.order_number,
+    totalAmount: order.total_amount,
+    status: order.status as OrderStatus,
+  };
+}
+
+// ─── Tạo đơn hàng cho user đã đăng nhập ───────────────────
+export async function createUserOrder(
+  userId: string,
+  addressId: string,
+  cartItems: CartItem[],
+  note: string = "",
+  paymentMethod: "cod" | "bank_transfer" = "cod"
+): Promise<CreatedOrder> {
+  if (cartItems.length === 0) throw new Error("Giỏ hàng trống");
+
+  const supabase = getSupabase();
+  const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
+  const shippingFee = subtotal >= 500000 ? 0 : 30000;
+  const totalAmount = subtotal + shippingFee;
+
+  const { data: order, error: orderErr } = await supabase
+    .from("orders")
+    .insert({
+      user_id: userId,
+      address_id: addressId,
+      total_amount: totalAmount,
+      shipping_fee: shippingFee,
+      note,
+      payment_method: paymentMethod,
+      status: "pending",
+    })
+    .select("id, order_number, total_amount, status")
+    .single();
+
+  if (orderErr) throw orderErr;
+  if (!order) throw new Error("Không tạo được đơn hàng");
+
+  const orderItems = cartItems.map((item) => ({
+    order_id: order.id,
+    product_id: item.productId,
+    variant_id: null,
+    quantity: item.quantity,
+    unit_price: item.price,
+    custom_options: {},
+  }));
+
+  const { error: itemsErr } = await supabase.from("order_items").insert(orderItems);
+  if (itemsErr) throw itemsErr;
+
+  return {
+    id: order.id,
+    orderNumber: order.order_number,
+    totalAmount: order.total_amount,
+    status: order.status as OrderStatus,
+  };
+}
+
+// ─── Tra cứu đơn hàng (guest: số ĐT + mã đơn) ─────────────
+export interface OrderTrackingResult {
+  id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  totalAmount: number;
+  shippingFee: number;
+  guestName: string;
+  guestAddress: GuestAddress | null;
+  paymentMethod: string;
+  note: string;
+  createdAt: string;
+  items: {
+    productId: string;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    image: string;
+  }[];
+}
+
+export async function trackGuestOrder(
+  orderNumber: string,
+  phone: string
+): Promise<OrderTrackingResult | null> {
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select(`
+      id, order_number, status, total_amount, shipping_fee,
+      guest_name, guest_address, payment_method, note, created_at,
+      order_items (
+        product_id, quantity, unit_price,
+        products ( name, images )
+      )
+    `)
+    .eq("order_number", orderNumber.toUpperCase())
+    .eq("guest_phone", phone.trim())
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const items = (data.order_items ?? []).map((oi: any) => ({
+    productId: oi.product_id,
+    productName: oi.products?.name ?? "Sản phẩm",
+    quantity: oi.quantity,
+    unitPrice: oi.unit_price,
+    image: oi.products?.images?.[0] ?? "",
+  }));
+
+  return {
+    id: data.id,
+    orderNumber: data.order_number,
+    status: data.status as OrderStatus,
+    totalAmount: data.total_amount,
+    shippingFee: data.shipping_fee,
+    guestName: data.guest_name ?? "",
+    guestAddress: data.guest_address as GuestAddress | null,
+    paymentMethod: data.payment_method,
+    note: data.note ?? "",
+    createdAt: data.created_at,
+    items,
+  };
+}
+
+// ─── Format tiền VNĐ ───────────────────────────────────────
+export function fmtVnd(amount: number) {
+  return amount.toLocaleString("vi-VN") + "đ";
+}
+
+// ─── Status label + màu ────────────────────────────────────
+export const STATUS_LABEL: Record<string, string> = {
+  pending:       "Chờ xác nhận",
+  confirmed:     "Đã xác nhận",
+  in_progress:   "Đang sản xuất",
+  quality_check: "Kiểm tra chất lượng",
+  ready_to_ship: "Sẵn sàng giao",
+  shipped:       "Đang giao hàng",
+  delivered:     "Đã giao — Hoàn thành",
+  cancelled:     "Đã hủy",
+  error:         "Tạm dừng",
+};
+
+export const STATUS_COLOR: Record<string, string> = {
+  pending:       "bg-gray-100 text-gray-700",
+  confirmed:     "bg-blue-100 text-blue-700",
+  in_progress:   "bg-yellow-100 text-yellow-800",
+  quality_check: "bg-green-100 text-green-700",
+  ready_to_ship: "bg-orange-100 text-orange-700",
+  shipped:       "bg-purple-100 text-purple-700",
+  delivered:     "bg-emerald-100 text-emerald-700",
+  cancelled:     "bg-red-100 text-red-700",
+  error:         "bg-purple-100 text-purple-800",
+};
+
+export const STATUS_FLOW = [
+  "pending",
+  "confirmed",
+  "in_progress",
+  "quality_check",
+  "ready_to_ship",
+  "shipped",
+  "delivered",
+] as const;
