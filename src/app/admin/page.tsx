@@ -565,6 +565,19 @@ export default function AdminDashboard() {
   const issueOrders     = orders.filter(o => o.status === 'issue');
   const qcOrders        = orders.filter(o => o.status === 'qc');
   const shippingOrders  = orders.filter(o => o.status === 'shipping');
+  const deliveredOrders = orders.filter(o => o.status === 'delivered');
+  const cancelledOrders = orders.filter(o => o.status === 'cancelled');
+
+  // Parse giá từ string '700.000đ' → number 700000
+  function parsePrice(p: string): number {
+    return parseInt(p.replace(/[^\d]/g, ''), 10) || 0;
+  }
+
+  // Doanh thu computed — tính realtime từ orders state
+  const revenueDelivered = deliveredOrders.reduce((s, o) => s + parsePrice(o.price), 0);
+  const revenueAll = orders.reduce((s, o) => s + parsePrice(o.price), 0);
+  const revenueActive = orders.filter(o => !['delivered', 'cancelled'].includes(o.status)).reduce((s, o) => s + parsePrice(o.price), 0);
+  const revenuePending = pendingOrders.reduce((s, o) => s + parsePrice(o.price), 0);
 
   // --- DND KIT LOGIC ---
   const sensors = useSensors(
@@ -858,88 +871,66 @@ export default function AdminDashboard() {
 
           {/* ============================ OVERVIEW ============================ */}
           {activeTab === 'overview' && (() => {
-            const today = DAILY_REVENUE[DAILY_REVENUE.length - 1];
-            const yesterday = DAILY_REVENUE[DAILY_REVENUE.length - 2];
-            const last7 = DAILY_REVENUE.slice(-7);
-            const prev7 = DAILY_REVENUE.slice(-14, -7);
-            const week = last7.reduce((s, d) => s + d.revenue, 0);
-            const prevWeek = prev7.reduce((s, d) => s + d.revenue, 0);
-            const month = DAILY_REVENUE.reduce((s, d) => s + d.revenue, 0);
-            const monthProfit = DAILY_REVENUE.reduce((s, d) => s + d.profit, 0);
-            const deltaToday = ((today.revenue - yesterday.revenue) / yesterday.revenue * 100);
-            const deltaWeek = ((week - prevWeek) / prevWeek * 100);
-            const chartData = revenueRange === '7' ? last7 : DAILY_REVENUE;
+            // Doanh thu computed realtime từ orders state
+            const totalOrders = orders.length;
+            const activeOrderCount = orders.filter(o => !['delivered', 'cancelled'].includes(o.status)).length;
+            const profitMargin = 0.48; // Biên lợi nhuận ~ 48%
+            const estimatedProfit = Math.round(revenueDelivered * profitMargin);
+            const chartData = revenueRange === '7' ? DAILY_REVENUE.slice(-7) : DAILY_REVENUE;
             const chartMax = Math.max(...chartData.map(d => d.revenue));
 
             return (
               <div className="h-full overflow-y-auto p-6 bg-gray-50 space-y-6">
 
-                {/* Section A: Doanh thu & Lợi nhuận */}
+                {/* Section A: Doanh thu & Lợi nhuận — COMPUTED FROM ORDERS */}
                 <section>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">💰 Doanh thu &amp; Lợi nhuận</h3>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">💰 Doanh thu &amp; Lợi nhuận <span className="text-[10px] font-normal text-emerald-600">(realtime từ đơn hàng)</span></h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                       <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Doanh thu hôm nay</h4>
-                        <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Đã thu (hoàn thành)</h4>
+                        <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">{formatVnd(today.revenue)}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${deltaToday >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                          {deltaToday >= 0 ? '▲' : '▼'} {Math.abs(deltaToday).toFixed(1)}%
-                        </span>
-                        <span className="text-xs text-gray-500">vs hôm qua</span>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1">{today.orders} đơn · TB {formatVnd(Math.round(today.revenue / today.orders))}</p>
+                      <p className="text-2xl font-bold text-emerald-700">{formatVnd(revenueDelivered)}</p>
+                      <p className="text-xs text-gray-400 mt-1">{deliveredOrders.length} đơn đã giao</p>
                     </div>
 
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                       <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Doanh thu tuần này</h4>
+                        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Đang xử lý</h4>
+                        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                      </div>
+                      <p className="text-2xl font-bold text-gray-900">{formatVnd(revenueActive)}</p>
+                      <p className="text-xs text-gray-400 mt-1">{activeOrderCount} đơn đang xử lý</p>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Tổng doanh thu</h4>
                         <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">{formatVnd(week)}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${deltaWeek >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                          {deltaWeek >= 0 ? '▲' : '▼'} {Math.abs(deltaWeek).toFixed(1)}%
-                        </span>
-                        <span className="text-xs text-gray-500">vs tuần trước</span>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1">{last7.reduce((s, d) => s + d.orders, 0)} đơn hoàn tất</p>
-                    </div>
-
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Doanh thu tháng 8</h4>
-                        <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                      </div>
-                      <p className="text-2xl font-bold text-gray-900">{formatVnd(month)}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">▲ 8.0%</span>
-                        <span className="text-xs text-gray-500">vs T7</span>
-                      </div>
+                      <p className="text-2xl font-bold text-gray-900">{formatVnd(revenueAll)}</p>
                       <div className="mt-2">
                         <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
-                          <span>Mục tiêu 120tr</span>
-                          <span className="font-bold text-gray-700">{Math.round(month / 120000000 * 100)}%</span>
+                          <span>{totalOrders} đơn tổng cộng</span>
+                          <span className="font-bold text-gray-700">{cancelledOrders.length > 0 ? `${cancelledOrders.length} hủy` : 'Chưa có hủy'}</span>
                         </div>
                         <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(100, month / 120000000 * 100)}%` }}></div>
+                          <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${totalOrders > 0 ? Math.round(deliveredOrders.length / totalOrders * 100) : 0}%` }}></div>
                         </div>
                       </div>
                     </div>
 
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                       <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Lợi nhuận gộp</h4>
+                        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Lợi nhuận ước tính</h4>
                         <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">{formatVnd(monthProfit)}</p>
+                      <p className="text-2xl font-bold text-gray-900">{formatVnd(estimatedProfit)}</p>
                       <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">Biên {Math.round(monthProfit / month * 100)}%</span>
-                        <span className="text-xs text-gray-500">▲ +3pp</span>
+                        <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">Biên ~48%</span>
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">Vải + chỉ 28.9tr · Nhân công 17.5tr</p>
+                      <p className="text-xs text-gray-400 mt-1">Từ {deliveredOrders.length} đơn hoàn thành</p>
                     </div>
                   </div>
                 </section>
@@ -979,13 +970,13 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                      <h4 className="text-xs font-medium text-gray-500 mb-1">Hoàn thành hôm nay</h4>
-                      <p className="text-2xl font-bold text-emerald-600">3 đơn</p>
+                      <h4 className="text-xs font-medium text-gray-500 mb-1">Hoàn thành</h4>
+                      <p className="text-2xl font-bold text-emerald-600">{deliveredOrders.length} đơn</p>
                       <div className="mt-3 space-y-1 text-xs text-gray-600">
-                        <div className="flex justify-between"><span>Đã giao</span><span className="font-bold">2</span></div>
-                        <div className="flex justify-between"><span>Sẵn sàng giao</span><span className="font-bold">1</span></div>
+                        <div className="flex justify-between"><span>Đã giao</span><span className="font-bold">{deliveredOrders.length}</span></div>
+                        <div className="flex justify-between"><span>Đã hủy</span><span className="font-bold text-red-500">{cancelledOrders.length}</span></div>
                       </div>
-                      <p className="text-xs text-emerald-600 font-bold mt-2">+ {formatVnd(today.revenue)} ghi nhận</p>
+                      <p className="text-xs text-emerald-600 font-bold mt-2">+ {formatVnd(revenueDelivered)} ghi nhận</p>
                     </div>
 
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
@@ -1049,21 +1040,19 @@ export default function AdminDashboard() {
                             <span className="text-xs text-gray-500">Tổng doanh thu</span>
                             <span className="text-xs font-bold text-emerald-600">+8% ▲</span>
                           </div>
-                          <p className="text-lg font-bold text-gray-900">{formatVnd(month)}</p>
+                          <p className="text-lg font-bold text-gray-900">{formatVnd(revenueAll)}</p>
                         </div>
                         <div>
                           <div className="flex justify-between items-baseline">
                             <span className="text-xs text-gray-500">Số đơn hoàn tất</span>
-                            <span className="text-xs font-bold text-emerald-600">+11% ▲</span>
                           </div>
-                          <p className="text-lg font-bold text-gray-900">{DAILY_REVENUE.reduce((s, d) => s + d.orders, 0)} đơn</p>
+                          <p className="text-lg font-bold text-gray-900">{deliveredOrders.length} đơn</p>
                         </div>
                         <div>
                           <div className="flex justify-between items-baseline">
                             <span className="text-xs text-gray-500">AOV (giá trị TB)</span>
-                            <span className="text-xs font-bold text-red-600">-2.7% ▼</span>
                           </div>
-                          <p className="text-lg font-bold text-gray-900">{formatVnd(Math.round(month / DAILY_REVENUE.reduce((s, d) => s + d.orders, 0)))}</p>
+                          <p className="text-lg font-bold text-gray-900">{formatVnd(totalOrders > 0 ? Math.round(revenueAll / totalOrders) : 0)}</p>
                         </div>
                         <div>
                           <div className="flex justify-between items-baseline">
