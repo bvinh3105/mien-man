@@ -201,7 +201,7 @@ function SortableOrderCard({ order, onClick, isOverlay }: { order: any, onClick?
     >
       {/* Header: ID + Timestamp/Badge */}
       <div className="flex justify-between items-start mb-2">
-        <span className={`text-sm font-bold ${order.status === 'cancelled' ? 'text-gray-500 line-through' : 'text-gray-900'}`}>{order.id}</span>
+        <span className={`text-sm font-bold ${order.status === 'cancelled' ? 'text-gray-500 line-through' : 'text-gray-900'}`}>{order.order_number || order.id}</span>
         {order.status === 'issue' && <span className="text-[10px] text-white bg-purple-500 px-1.5 py-0.5 rounded uppercase font-bold">Hold</span>}
         {order.status === 'qc' && <span className="text-[10px] text-white bg-green-500 px-1.5 py-0.5 rounded uppercase font-bold">QC</span>}
         {order.status === 'delivered' && <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-0.5">✓ Đã nhận</span>}
@@ -513,6 +513,7 @@ function AdminDashboard() {
 
         const mapped = data.map((o: any) => ({
           id: o.id,
+          order_number: o.order_number,
           status: DB_TO_LOCAL[o.status] ?? o.status,
           color: colorFor(DB_TO_LOCAL[o.status] ?? o.status),
           name: o.guest_name ?? 'Khách hàng',
@@ -539,6 +540,7 @@ function AdminDashboard() {
         const colorFor = (s: string) => s === 'pending' ? 'gray' : s === 'producing' ? 'blue' : s === 'issue' ? 'purple' : s === 'qc' ? 'green' : s === 'shipping' ? 'amber' : s === 'delivered' ? 'emerald' : s === 'cancelled' ? 'red' : 'gray';
         setOrders(prev => [{
           id: o.id,
+          order_number: o.order_number,
           status: localStatus,
           color: colorFor(localStatus),
           name: o.guest_name ?? 'Khách hàng',
@@ -1738,7 +1740,7 @@ function AdminDashboard() {
                       {filtered.map((order) => (
                         <tr key={order.id} className="hover:bg-gray-50 transition group">
                           <td className="p-4">
-                            <span className="font-bold text-gray-900 text-sm font-mono">{order.id}</span>
+                            <span className="font-bold text-gray-900 text-sm font-mono">{(order as any).order_number || order.id}</span>
                           </td>
                           <td className="p-4">
                             <div className="flex items-center gap-2.5">
@@ -1796,7 +1798,7 @@ function AdminDashboard() {
                     <div className="space-y-2">
                       {filtered.filter(o => o.status !== 'delivered').map(order => (
                         <div key={order.id} className={`flex items-start gap-3 p-3 rounded-lg border ${order.status === 'cancelled' ? 'bg-red-50/50 border-red-100' : 'bg-amber-50/50 border-amber-100'}`}>
-                          <span className="font-mono text-xs font-bold text-gray-500 mt-0.5 shrink-0">{order.id}</span>
+                          <span className="font-mono text-xs font-bold text-gray-500 mt-0.5 shrink-0">{(order as any).order_number || order.id}</span>
                           <p className="text-sm text-gray-700">{order.reason}</p>
                           <span className={`ml-auto text-xs font-bold shrink-0 px-2 py-0.5 rounded ${order.status === 'cancelled' ? 'text-red-700 bg-red-100' : 'text-amber-700 bg-amber-100'}`}>
                             {order.status === 'cancelled' ? 'Hủy' : 'Hoàn'}
@@ -2209,7 +2211,7 @@ function AdminDashboard() {
           <>
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between bg-white z-10 shrink-0">
               <div>
-                <h2 className="text-xl font-bold">Đơn {orderModal.id}</h2>
+                <h2 className="text-xl font-bold">Đơn {orderModal.order_number || orderModal.id}</h2>
                 <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-bold ${orderModal.color === 'gray' ? 'bg-gray-200 text-gray-800' : orderModal.color === 'blue' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
                   {orderModal.uiStatus}
                 </span>
@@ -2536,7 +2538,7 @@ function AdminDashboard() {
                               </div>
                               <p className="text-xs text-gray-500 mt-0.5 truncate">{order.items}</p>
                               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                <span className="text-[10px] font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{order.id}</span>
+                                <span className="text-[10px] font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{(order as any).order_number || order.id}</span>
                                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${STATUS_COLOR[order.status] || 'bg-gray-100 text-gray-600'}`}>
                                   {STATUS_VI[order.status] || order.status}
                                 </span>
