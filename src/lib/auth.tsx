@@ -85,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signUp(email: string, password: string, fullName: string) {
     const sb = getSupabaseSafe();
-    if (!sb) return { error: "Supabase chưa được cấu hình." };
+    if (!sb) return { error: "Chức năng đăng ký tài khoản đang được cập nhật. Vui lòng thử lại sau." };
     try {
       const { error } = await sb.auth.signUp({
         email,
@@ -100,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signIn(email: string, password: string) {
     const sb = getSupabaseSafe();
-    if (!sb) return { error: "Supabase chưa được cấu hình." };
+    if (!sb) return { error: "Chức năng đăng nhập tài khoản đang được cập nhật. Vui lòng thử lại sau." };
     try {
       const { error } = await sb.auth.signInWithPassword({
         email,
