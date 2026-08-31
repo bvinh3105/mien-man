@@ -1,10 +1,100 @@
 // ============================================================
 // Orders Service — tạo đơn hàng (guest + user) + tra cứu
+// Có fallback localStorage khi Supabase chưa được cấu hình
 // ============================================================
 
 import { getSupabase as _getSupabase } from "./supabase";
 import type { CartItem } from "./cart";
 import type { GuestAddress, OrderStatus } from "@/types/database";
+
+// ─── LOCAL ORDER FALLBACK (localStorage) ───────────────────
+const LOCAL_ORDERS_KEY = "mm_local_orders";
+
+interface LocalOrder {
+  id: string;
+  orderNumber: string;
+  totalAmount: number;
+  shippingFee: number;
+  status: OrderStatus;
+  guest: GuestInfo;
+  items: CartItem[];
+  createdAt: string;
+}
+
+function getLocalOrders(): LocalOrder[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_ORDERS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalOrders(orders: LocalOrder[]) {
+  try {
+    localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(orders));
+  } catch {
+    // ignore
+  }
+}
+
+function generateLocalOrderNumber(): string {
+  const orders = getLocalOrders();
+  const next = orders.length + 1;
+  return `MM-${String(next).padStart(3, "0")}`;
+}
+
+function createLocalOrder(guest: GuestInfo, cartItems: CartItem[]): CreatedOrder {
+  const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
+  const shippingFee = subtotal >= 500000 ? 0 : 30000;
+  const totalAmount = subtotal + shippingFee;
+  const orderNumber = generateLocalOrderNumber();
+  const id = `local-${Date.now()}`;
+
+  const order: LocalOrder = {
+    id,
+    orderNumber,
+    totalAmount,
+    shippingFee,
+    status: "pending",
+    guest,
+    items: cartItems,
+    createdAt: new Date().toISOString(),
+  };
+
+  const orders = getLocalOrders();
+  orders.push(order);
+  saveLocalOrders(orders);
+
+  return { id, orderNumber, totalAmount, status: "pending" };
+}
+
+function trackLocalOrder(orderNumber: string, phone: string): OrderTrackingResult | null {
+  const orders = getLocalOrders();
+  const order = orders.find(
+    o => o.orderNumber === orderNumber.toUpperCase() && o.guest.phone.trim() === phone.trim()
+  );
+  if (!order) return null;
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    totalAmount: order.totalAmount,
+    shippingFee: order.shippingFee,
+    guestName: order.guest.name,
+    guestAddress: order.guest.address,
+    paymentMethod: order.guest.paymentMethod ?? "cod",
+    note: order.guest.note ?? "",
+    createdAt: order.createdAt,
+    items: order.items.map(i => ({
+      productId: i.productId,
+      productName: i.name,
+      quantity: i.quantity,
+      unitPrice: i.price,
+      image: i.image,
+    })),
+  };
+}
 
 // Cast để tránh strict Supabase generics (giống products.ts)
 function getSupabase() {
@@ -39,7 +129,13 @@ export async function createGuestOrder(
   if (!guest.address.district) throw new Error("Vui lòng nhập quận/huyện");
   if (!guest.address.province) throw new Error("Vui lòng nhập tỉnh/thành");
 
-  const supabase = getSupabase();
+  // Thử Supabase — nếu offline, dùng localStorage fallback
+  let supabase: ReturnType<typeof getSupabase>;
+  try {
+    supabase = getSupabase();
+  } catch {
+    return createLocalOrder(guest, cartItems);
+  }
 
   const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
   const shippingFee = subtotal >= 500000 ? 0 : 30000; // Miễn ship ≥ 500k
@@ -63,8 +159,9 @@ export async function createGuestOrder(
     .select("id, order_number, total_amount, status")
     .single();
 
-  if (orderErr) throw orderErr;
-  if (!order) throw new Error("Không tạo được đơn hàng");
+  // Nếu Supabase lỗi (network/config) → fallback local
+  if (orderErr) return createLocalOrder(guest, cartItems);
+  if (!order) return createLocalOrder(guest, cartItems);
 
   // 2. Tạo order_items
   const orderItems = cartItems.map((item) => ({
@@ -77,7 +174,7 @@ export async function createGuestOrder(
   }));
 
   const { error: itemsErr } = await supabase.from("order_items").insert(orderItems);
-  if (itemsErr) throw itemsErr;
+  if (itemsErr) console.warn("order_items insert failed:", itemsErr.message);
 
   return {
     id: order.id,
@@ -164,7 +261,17 @@ export async function trackGuestOrder(
   orderNumber: string,
   phone: string
 ): Promise<OrderTrackingResult | null> {
-  const supabase = getSupabase();
+  // Check localStorage trước (đơn local)
+  const localResult = trackLocalOrder(orderNumber, phone);
+  if (localResult) return localResult;
+
+  // Thử Supabase
+  let supabase: ReturnType<typeof getSupabase>;
+  try {
+    supabase = getSupabase();
+  } catch {
+    return null;
+  }
 
   const { data, error } = await supabase
     .from("orders")
@@ -180,7 +287,7 @@ export async function trackGuestOrder(
     .eq("guest_phone", phone.trim())
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) return null;
   if (!data) return null;
 
   const items = (data.order_items ?? []).map((oi: any) => ({
