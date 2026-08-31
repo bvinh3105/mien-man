@@ -259,10 +259,25 @@ create policy "Users read own profile"
 create policy "Users update own profile"
   on public.profiles for update using (auth.uid() = id);
 
-create policy "Admin read all profiles"
-  on public.profiles for select using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+-- Hàm SECURITY DEFINER để check quyền admin — tránh infinite recursion.
+-- Nếu policy admin ở đây tự query lại profiles bằng exists(...) trực tiếp,
+-- Postgres sẽ áp RLS lên chính câu query đó → lặp vô hạn (error 42P17).
+-- Hàm này chạy với quyền người tạo (bypass RLS) nên không bị đệ quy.
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'admin'
   );
+$$;
+
+create policy "Admin read all profiles"
+  on public.profiles for select using (public.is_admin());
 
 -- ADDRESSES
 alter table public.addresses enable row level security;
@@ -278,7 +293,7 @@ create policy "Anyone read categories"
 
 create policy "Admin manage categories"
   on public.categories for all using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    public.is_admin()
   );
 
 -- PRODUCTS — public read active, admin all
@@ -289,7 +304,7 @@ create policy "Anyone read active products"
 
 create policy "Admin manage products"
   on public.products for all using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    public.is_admin()
   );
 
 -- PRODUCT VARIANTS
@@ -300,7 +315,7 @@ create policy "Anyone read variants"
 
 create policy "Admin manage variants"
   on public.product_variants for all using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    public.is_admin()
   );
 
 -- ORDERS
@@ -322,12 +337,12 @@ create policy "Guest track own order"
 
 create policy "Admin read all orders"
   on public.orders for select using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    public.is_admin()
   );
 
 create policy "Admin update orders"
   on public.orders for update using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    public.is_admin()
   );
 
 -- ORDER ITEMS
@@ -345,7 +360,7 @@ create policy "Users insert own order items"
 
 create policy "Admin read all order items"
   on public.order_items for select using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    public.is_admin()
   );
 
 -- ORDER HISTORY
@@ -358,7 +373,7 @@ create policy "Users read own order history"
 
 create policy "Admin manage order history"
   on public.order_history for all using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    public.is_admin()
   );
 
 -- PAYMENTS
@@ -371,7 +386,7 @@ create policy "Users read own payments"
 
 create policy "Admin manage payments"
   on public.payments for all using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    public.is_admin()
   );
 
 -- CART
