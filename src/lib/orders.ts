@@ -141,6 +141,10 @@ export async function createGuestOrder(
   const shippingFee = subtotal >= 500000 ? 0 : 30000; // Miễn ship ≥ 500k
   const totalAmount = subtotal + shippingFee;
 
+  // Tóm tắt sản phẩm — ghi vào note để Admin Kanban hiển thị ngay,
+  // không phụ thuộc join order_items (phòng khi resolve product_id thất bại)
+  const itemsSummary = cartItems.map((i) => `${i.name} (x${i.quantity})`).join(", ");
+
   // 1. Tạo order
   const { data: order, error: orderErr } = await supabase
     .from("orders")
@@ -152,7 +156,7 @@ export async function createGuestOrder(
       guest_address: guest.address,
       total_amount: totalAmount,
       shipping_fee: shippingFee,
-      note: guest.note?.trim() || "",
+      note: guest.note?.trim() || itemsSummary,
       payment_method: guest.paymentMethod ?? "cod",
       status: "pending",
     })
@@ -163,18 +167,33 @@ export async function createGuestOrder(
   if (orderErr) return createLocalOrder(guest, cartItems);
   if (!order) return createLocalOrder(guest, cartItems);
 
-  // 2. Tạo order_items
-  const orderItems = cartItems.map((item) => ({
-    order_id: order.id,
-    product_id: item.productId,
-    variant_id: null,
-    quantity: item.quantity,
-    unit_price: item.price,
-    custom_options: {},
-  }));
+  // 2. Resolve product_id thật qua slug — trang sản phẩm là static (data.ts),
+  // nên cartItems.productId là id giả ("p1"...) không khớp UUID thật trong DB.
+  const slugs = Array.from(new Set(cartItems.map((i) => i.slug)));
+  const { data: realProducts } = await supabase
+    .from("products")
+    .select("id, slug")
+    .in("slug", slugs);
+  const slugToId = new Map((realProducts ?? []).map((p: any) => [p.slug, p.id]));
 
-  const { error: itemsErr } = await supabase.from("order_items").insert(orderItems);
-  if (itemsErr) console.warn("order_items insert failed:", itemsErr.message);
+  // 3. Tạo order_items — bỏ qua sản phẩm chưa có trong DB (chưa chạy seed.sql)
+  const orderItems = cartItems
+    .filter((item) => slugToId.has(item.slug))
+    .map((item) => ({
+      order_id: order.id,
+      product_id: slugToId.get(item.slug),
+      variant_id: null,
+      quantity: item.quantity,
+      unit_price: item.price,
+      custom_options: {},
+    }));
+
+  if (orderItems.length > 0) {
+    const { error: itemsErr } = await supabase.from("order_items").insert(orderItems);
+    if (itemsErr) console.warn("order_items insert failed:", itemsErr.message);
+  } else {
+    console.warn("Không resolve được product_id nào — sản phẩm chưa có trong Supabase (chạy seed.sql?)");
+  }
 
   return {
     id: order.id,
