@@ -358,6 +358,20 @@ create policy "Users insert own order items"
     exists (select 1 from public.orders where id = order_id and user_id = auth.uid())
   );
 
+create policy "Guest insert order items"
+  on public.order_items for insert
+  to anon
+  with check (
+    exists (select 1 from public.orders where id = order_id and user_id is null)
+  );
+
+create policy "Guest read own order items"
+  on public.order_items for select
+  to anon
+  using (
+    exists (select 1 from public.orders where id = order_id and user_id is null)
+  );
+
 create policy "Admin read all order items"
   on public.order_items for select using (
     public.is_admin()
