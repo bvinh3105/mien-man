@@ -86,7 +86,7 @@ function LoginForm() {
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-sage-700">Tài khoản</label>
             <input id="email" type="text" value={email} onChange={(e) => setEmail(e.target.value)} required
-              placeholder="Email hoặc mã nội bộ"
+              placeholder="Email hoặc tên đăng nhập"
               className="mt-1 w-full px-3 py-2 border border-sage-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white" />
           </div>
           <div>
