@@ -5,18 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 import { useAuth } from "@/lib/auth";
 
-// ─── Mã nội bộ admin ───────────────────────────
-// Hash đơn giản để không lưu plaintext trong bundle
-async function hashCode(text: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(text);
-  const buffer = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
-// SHA-256 hashes (không lưu plaintext)
-const ADMIN_CODE_HASH = "9cdf7c32a063fca110dd74e11b8fd61d0b549d8efc35034f89b21119f7f2bb8b";
-const ADMIN_PASS_HASH = "4c07e3d54c8512a4492504ade13f214c4faaf18f10e4f5f2fee178559fa9eabe";
 
 function LoginForm() {
   const router = useRouter();
@@ -46,21 +34,6 @@ function LoginForm() {
     setError("");
     setLoading(true);
 
-    // ── Check mã nội bộ admin trước ──
-    const [inputHash, passHash] = await Promise.all([
-      hashCode(email.trim()),
-      hashCode(password),
-    ]);
-
-    if (inputHash === ADMIN_CODE_HASH && passHash === ADMIN_PASS_HASH) {
-      // Mã nội bộ đúng → lưu session flag + vào admin
-      sessionStorage.setItem("mm_admin", "1");
-      setLoading(false);
-      router.push("/admin");
-      return;
-    }
-
-    // ── Nếu không phải mã nội bộ → thử Supabase auth ──
     const { error: err } = await signIn(email, password);
     setLoading(false);
 

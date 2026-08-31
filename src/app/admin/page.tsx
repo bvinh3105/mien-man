@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import Link from 'next/link';
-// import AdminGuard from '@/components/AdminGuard'; // TODO: bật lại khi deploy
+import AdminGuard from '@/components/AdminGuard';
 import {
   DndContext,
   DragOverlay,
@@ -356,19 +356,18 @@ function PermissionCell({ value, small = false }: { value: RolePermission; small
   );
 }
 
-// TODO: bật lại AdminGuard khi deploy
-// export default function AdminPage() {
-//   return (
-//     <AdminGuard>
-//       <AdminDashboard />
-//     </AdminGuard>
-//   );
-// }
+export default function AdminPage() {
+  return (
+    <AdminGuard>
+      <AdminDashboard />
+    </AdminGuard>
+  );
+}
 
 type AdminTab = 'overview' | 'orders' | 'products' | 'customers' | 'history' | 'accounting' | 'roles';
 const CURRENT_ROLE: RoleKey = 'owner'; // TODO: lấy từ Supabase session ở Step 2
 
-export default function AdminDashboard() {
+function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [orders, setOrders] = useState(INITIAL_ORDERS);
   const [activeId, setActiveId] = useState<string | null>(null);
