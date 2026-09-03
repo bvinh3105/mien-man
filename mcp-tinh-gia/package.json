@@ -1,0 +1,17 @@
+{
+  "name": "mcp-tinh-gia-theu",
+  "version": "1.0.0",
+  "description": "MCP server tinh gia san pham theu pixel sprite cho Mien Man",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "mcp-tinh-gia-theu": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.23.8"
+  }
+}
