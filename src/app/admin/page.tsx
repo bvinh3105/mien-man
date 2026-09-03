@@ -398,6 +398,9 @@ function AdminDashboard() {
   const [productSaving, setProductSaving] = useState(false);
   const [productDeleteConfirm, setProductDeleteConfirm] = useState<string | null>(null);
   const [productForm, setProductForm] = useState<Partial<ProductInput>>({});
+  const [productImageUploading, setProductImageUploading] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [productCategoryFilter, setProductCategoryFilter] = useState('');
 
   // Đồng bộ productForm khi productModal thay đổi
   React.useEffect(() => {
@@ -455,6 +458,36 @@ function AdminDashboard() {
     } catch (e) {
       alert('Lỗi khi xoá: ' + (e instanceof Error ? e.message : String(e)));
     }
+  }
+
+  // Upload ảnh sản phẩm lên Supabase Storage (bucket "product-images")
+  async function handleProductImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    const client = getSupabase() as any;
+    setProductImageUploading(true);
+    try {
+      const uploadedUrls: string[] = [];
+      for (const file of files) {
+        const ext = file.name.split('.').pop() || 'jpg';
+        const safeSlug = (productForm.slug || 'san-pham').replace(/[^a-z0-9-]/g, '');
+        const path = `${safeSlug}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const { error } = await client.storage.from('product-images').upload(path, file, { cacheControl: '3600' });
+        if (error) throw error;
+        const { data } = client.storage.from('product-images').getPublicUrl(path);
+        uploadedUrls.push(data.publicUrl);
+      }
+      setProductForm(prev => ({ ...prev, images: [...(prev.images ?? []), ...uploadedUrls] }));
+    } catch (err) {
+      alert('Lỗi upload ảnh: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setProductImageUploading(false);
+      e.target.value = '';
+    }
+  }
+
+  function removeProductImage(index: number) {
+    setProductForm(prev => ({ ...prev, images: (prev.images ?? []).filter((_, i) => i !== index) }));
   }
 
   const hasAnyModalOpen = !!orderModal || !!productModal || !!customerModal || !!revenueDrill;
@@ -1395,47 +1428,79 @@ function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                  <table className="w-full text-left border-collapse text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500">
-                      <tr>
-                        <th className="p-3 font-bold">Sản phẩm</th>
-                        <th className="p-3 font-bold">Danh mục</th>
-                        <th className="p-3 font-bold text-right">Giá gốc</th>
-                        <th className="p-3 font-bold text-right">Giá bán</th>
-                        <th className="p-3 font-bold text-center">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {liveProducts.map(prod => (
-                        <tr key={prod.id} className="hover:bg-gray-50 transition">
-                          <td className="p-3">
-                            <div className="flex items-center gap-3">
-                              {prod.images[0] && (
-                                <div className="w-10 h-10 rounded overflow-hidden bg-gray-100 shrink-0">
-                                  <img src={prod.images[0]} alt={prod.name} className="w-full h-full object-cover" />
+                {/* Thanh tìm kiếm + lọc danh mục */}
+                <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                  <div className="relative flex-1">
+                    <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    <input
+                      type="text"
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      placeholder="Tìm sản phẩm theo tên..."
+                      className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    />
+                  </div>
+                  <select
+                    value={productCategoryFilter}
+                    onChange={(e) => setProductCategoryFilter(e.target.value)}
+                    className="border border-gray-200 rounded-lg py-2 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  >
+                    <option value="">Tất cả danh mục</option>
+                    {liveCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+
+                {(() => {
+                  const filteredProducts = liveProducts.filter(p =>
+                    (!productCategoryFilter || p.categoryId === productCategoryFilter) &&
+                    (!productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase()))
+                  );
+                  if (filteredProducts.length === 0) {
+                    return (
+                      <div className="bg-white border border-gray-200 rounded-xl p-10 text-center text-gray-400">
+                        <svg className="w-10 h-10 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                        <p className="text-sm font-medium">Không tìm thấy sản phẩm nào</p>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                      {filteredProducts.map(prod => {
+                        const discount = prod.salePrice ? Math.round((1 - prod.salePrice / prod.price) * 100) : 0;
+                        return (
+                          <div key={prod.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden group hover:shadow-md hover:border-emerald-200 transition-all">
+                            <div className="aspect-square bg-gray-100 relative overflow-hidden">
+                              {prod.images[0] ? (
+                                <img src={prod.images[0]} alt={prod.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-300">
+                                  <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                 </div>
                               )}
-                              <div className="min-w-0">
-                                <p className="font-bold text-gray-900 text-sm truncate">{prod.name}</p>
-                                <p className="text-[10px] text-gray-500 font-mono">{prod.slug}</p>
+                              {discount > 0 && (
+                                <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">-{discount}%</span>
+                              )}
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                                <button onClick={() => setProductModal(prod)} className="bg-white text-blue-700 text-xs font-bold px-3 py-1.5 rounded-full shadow hover:bg-blue-50">Sửa</button>
+                                <button onClick={() => setProductDeleteConfirm(prod.id)} className="bg-white text-red-700 text-xs font-bold px-3 py-1.5 rounded-full shadow hover:bg-red-50">Xoá</button>
                               </div>
                             </div>
-                          </td>
-                          <td className="p-3 text-xs text-gray-600">{prod.category.name}</td>
-                          <td className={`p-3 text-right font-mono text-xs text-gray-500 ${prod.salePrice ? 'line-through' : ''}`}>{formatVnd(prod.price)}</td>
-                          <td className="p-3 text-right font-bold text-emerald-600">{formatVnd(prod.salePrice ?? prod.price)}</td>
-                          <td className="p-3 text-center">
-                            <div className="flex gap-1 justify-center">
-                              <button onClick={() => setProductModal(prod)} className="text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-1 rounded hover:bg-blue-200">Sửa</button>
-                              <button onClick={() => setProductDeleteConfirm(prod.id)} className="text-[10px] bg-red-100 text-red-700 font-bold px-2 py-1 rounded hover:bg-red-200">Xoá</button>
+                            <div className="p-3">
+                              <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wide truncate">{prod.category.name}</p>
+                              <p className="font-bold text-gray-900 text-sm truncate mt-0.5" title={prod.name}>{prod.name}</p>
+                              <div className="flex items-baseline gap-1.5 mt-1.5 flex-wrap">
+                                <span className="font-bold text-emerald-700 text-sm">{formatVnd(prod.salePrice ?? prod.price)}</span>
+                                {prod.salePrice && (
+                                  <span className="text-[10px] text-gray-400 line-through">{formatVnd(prod.price)}</span>
+                                )}
+                              </div>
                             </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
 
                 {/* Delete confirm modal */}
                 {productDeleteConfirm && (
@@ -2380,21 +2445,53 @@ function AdminDashboard() {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold uppercase mb-1 text-gray-600">URL ảnh (1 dòng 1 URL)</label>
-            <textarea
-              rows={2}
-              value={(productForm.images ?? []).join('\n')}
-              onChange={(e) => setProductForm({ ...productForm, images: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
-              placeholder="https://placehold.co/600x800/..."
-              className="w-full border border-gray-300 rounded-md py-2 px-3 text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
-            />
-          </div>
-          {productForm.images && productForm.images[0] && (
-            <div className="border border-gray-200 rounded-lg p-2 bg-gray-50">
-              <p className="text-[10px] uppercase font-bold text-gray-500 mb-2">Preview</p>
-              <img src={productForm.images[0]} alt="preview" className="w-full h-32 object-cover rounded" />
+            <label className="block text-xs font-bold uppercase mb-2 text-gray-600">Ảnh sản phẩm</label>
+            <div className="flex flex-wrap gap-2">
+              {(productForm.images ?? []).map((url, i) => (
+                <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 group shrink-0">
+                  <img src={url} alt={`Ảnh ${i + 1}`} className="w-full h-full object-cover" />
+                  {i === 0 && (
+                    <span className="absolute bottom-0 inset-x-0 bg-emerald-600 text-white text-[8px] font-bold text-center py-0.5">ẢNH CHÍNH</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeProductImage(i)}
+                    className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition hover:bg-red-600"
+                  >✕</button>
+                </div>
+              ))}
+              <label className={`w-20 h-20 rounded-lg border-2 border-dashed flex flex-col items-center justify-center shrink-0 cursor-pointer transition ${productImageUploading ? 'border-gray-200 bg-gray-50' : 'border-gray-300 hover:border-emerald-400 hover:bg-emerald-50'}`}>
+                {productImageUploading ? (
+                  <svg className="w-5 h-5 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" /><path fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                    <span className="text-[9px] text-gray-400 font-bold mt-0.5">Thêm ảnh</span>
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  disabled={productImageUploading}
+                  onChange={handleProductImageUpload}
+                  className="hidden"
+                />
+              </label>
             </div>
-          )}
+            <p className="text-[10px] text-gray-400 mt-1.5">Ảnh đầu tiên hiện làm ảnh chính trên Shop. Kéo để sắp xếp lại (sắp có).</p>
+
+            <details className="mt-2">
+              <summary className="text-[10px] text-gray-500 font-bold cursor-pointer hover:text-gray-700">Hoặc dán URL ảnh trực tiếp</summary>
+              <textarea
+                rows={2}
+                value={(productForm.images ?? []).join('\n')}
+                onChange={(e) => setProductForm({ ...productForm, images: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
+                placeholder="https://..."
+                className="w-full mt-1.5 border border-gray-300 rounded-md py-2 px-3 text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+              />
+            </details>
+          </div>
         </div>
         <div className="p-4 border-t border-gray-200 bg-gray-50 flex gap-3 shrink-0">
           <button onClick={closeAllModals} disabled={productSaving} className="flex-1 bg-white border border-gray-300 py-2.5 rounded-lg font-bold text-sm text-gray-700 disabled:opacity-50">Hủy</button>
