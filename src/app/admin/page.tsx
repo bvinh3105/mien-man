@@ -441,7 +441,7 @@ function AdminDashboard() {
       await refreshProducts();
       closeAllModals();
     } catch (e) {
-      alert('Lỗi khi lưu: ' + (e instanceof Error ? e.message : String(e)) + '\n\nSupabase có đang chạy không? Docker Desktop → npx supabase start');
+      alert('Lỗi khi lưu: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
       setProductSaving(false);
     }
@@ -1423,7 +1423,7 @@ function AdminDashboard() {
                             </div>
                           </td>
                           <td className="p-3 text-xs text-gray-600">{prod.category.name}</td>
-                          <td className="p-3 text-right font-mono text-xs text-gray-500 {prod.salePrice ? 'line-through' : ''}">{formatVnd(prod.price)}</td>
+                          <td className={`p-3 text-right font-mono text-xs text-gray-500 ${prod.salePrice ? 'line-through' : ''}`}>{formatVnd(prod.price)}</td>
                           <td className="p-3 text-right font-bold text-emerald-600">{formatVnd(prod.salePrice ?? prod.price)}</td>
                           <td className="p-3 text-center">
                             <div className="flex gap-1 justify-center">
