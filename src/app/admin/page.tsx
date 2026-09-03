@@ -504,7 +504,9 @@ function AdminDashboard() {
           .order('created_at', { ascending: false })
           .limit(50);
 
-        if (error || !data || data.length === 0) return; // fallback mock
+        // Chỉ fallback mock khi thật sự lỗi (Supabase offline/chưa cấu hình).
+        // 0 đơn thật là trạng thái hợp lệ (DB đã kết nối, chỉ là chưa/không còn đơn nào) — không fallback.
+        if (error || !data) return;
 
         const colorFor = (s: string) =>
           s === 'pending' ? 'gray' : s === 'producing' ? 'blue' : s === 'issue' ? 'purple' :
