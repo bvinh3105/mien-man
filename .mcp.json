@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "tinh-gia-theu": {
-      "command": "node",
-      "args": ["mcp-tinh-gia/index.js"]
-    }
-  }
-}
