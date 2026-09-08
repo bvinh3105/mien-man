@@ -525,6 +525,43 @@ function AdminDashboard() {
     try { return getSupabase() as any; } catch { return null; }
   }
 
+  // Format địa chỉ guest (JSONB {street, ward, district, province}) thành 1 dòng
+  function formatAddress(addr: any): string {
+    if (!addr || typeof addr !== 'object') return '';
+    const parts = [addr.street, addr.ward, addr.district, addr.province].filter(Boolean);
+    return parts.join(', ');
+  }
+
+  // Chuyển 1 row Supabase → shape mà Kanban/modal đang dùng.
+  // DÙNG CHUNG cho cả fetch ban đầu và realtime INSERT — tránh mismatch shape.
+  // Return `any` vì INITIAL_ORDERS có nhiều biến thể (progress/machine/rating/...) TS
+  // không suy ra được union chuẩn — dùng any khớp với style hiện có của file này.
+  function mapDbOrder(o: any): any {
+    const colorFor = (s: string) =>
+      s === 'pending' ? 'gray' : s === 'producing' ? 'blue' : s === 'issue' ? 'purple' :
+      s === 'qc' ? 'green' : s === 'shipping' ? 'amber' : s === 'delivered' ? 'emerald' :
+      s === 'cancelled' ? 'red' : 'gray';
+    const localStatus = DB_TO_LOCAL[o.status] ?? o.status;
+    return {
+      id:            o.id,
+      order_number:  o.order_number,
+      status:        localStatus,
+      color:         colorFor(localStatus),
+      name:          o.guest_name ?? 'Khách hàng',
+      phone:         o.guest_phone ?? '',
+      email:         o.guest_email ?? '',
+      address:       formatAddress(o.guest_address),
+      addressRaw:    o.guest_address ?? null,
+      price:         (o.total_amount ?? 0).toLocaleString('vi-VN') + 'đ',
+      paymentMethod: (o.payment_method ?? 'cod').toUpperCase(),
+      time:          o.created_at ? new Date(o.created_at).toLocaleString('vi-VN') : 'Vừa xong',
+      items:         o.note || 'Đơn hàng',
+      avatar:        (o.guest_name ?? 'KH').substring(0, 2).toUpperCase(),
+      assignee:      null,
+      createdAt:     o.created_at ? new Date(o.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+    };
+  }
+
   // Extract fetch logic vào 1 hàm để cả useEffect và nút "Làm mới" dùng được
   async function fetchOrders() {
     const supabase = getClient();
@@ -536,7 +573,7 @@ function AdminDashboard() {
     try {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, order_number, status, total_amount, created_at, guest_name, guest_phone, payment_method, note')
+        .select('id, order_number, status, total_amount, created_at, guest_name, guest_phone, guest_email, guest_address, payment_method, note')
         .not('status', 'in', '(delivered,cancelled)')
         .order('created_at', { ascending: false })
         .limit(50);
@@ -549,26 +586,7 @@ function AdminDashboard() {
       }
       setFetchError(null);
       setDbOrderCount(data?.length ?? 0);
-
-      const colorFor = (s: string) =>
-        s === 'pending' ? 'gray' : s === 'producing' ? 'blue' : s === 'issue' ? 'purple' :
-        s === 'qc' ? 'green' : s === 'shipping' ? 'amber' : s === 'delivered' ? 'emerald' :
-        s === 'cancelled' ? 'red' : 'gray';
-
-      const mapped = (data ?? []).map((o: any) => ({
-        id: o.id,
-        order_number: o.order_number,
-        status: DB_TO_LOCAL[o.status] ?? o.status,
-        color: colorFor(DB_TO_LOCAL[o.status] ?? o.status),
-        name: o.guest_name ?? 'Khách hàng',
-        price: (o.total_amount ?? 0).toLocaleString('vi-VN') + 'đ',
-        paymentMethod: (o.payment_method ?? 'cod').toUpperCase(),
-        time: new Date(o.created_at).toLocaleString('vi-VN'),
-        items: o.note || 'Đơn hàng',
-        avatar: (o.guest_name ?? 'KH').substring(0, 2).toUpperCase(),
-        assignee: null,
-        createdAt: o.created_at ? new Date(o.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
-      }));
+      const mapped = (data ?? []).map((o: any) => mapDbOrder(o));
       setOrders(mapped);
     } catch (e) {
       console.error('[admin fetchOrders] exception:', e);
@@ -588,32 +606,15 @@ function AdminDashboard() {
     setRtStatus('connecting');
     const channel = supabase.channel('admin-kanban')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload: any) => {
-        const o = payload.new as any;
-        const localStatus = DB_TO_LOCAL[o.status] ?? 'pending';
-        const colorFor = (s: string) => s === 'pending' ? 'gray' : s === 'producing' ? 'blue' : s === 'issue' ? 'purple' : s === 'qc' ? 'green' : s === 'shipping' ? 'amber' : s === 'delivered' ? 'emerald' : s === 'cancelled' ? 'red' : 'gray';
-        setOrders(prev => [{
-          id: o.id,
-          order_number: o.order_number,
-          status: localStatus,
-          color: colorFor(localStatus),
-          name: o.guest_name ?? 'Khách hàng',
-          price: (o.total_amount ?? 0).toLocaleString('vi-VN') + 'đ',
-          paymentMethod: (o.payment_method ?? 'cod').toUpperCase(),
-          time: 'Vừa xong',
-          items: o.note || 'Đơn hàng mới',
-          avatar: (o.guest_name ?? 'KH').substring(0, 2).toUpperCase(),
-          assignee: null,
-          createdAt: (o.created_at ? new Date(o.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)),
-        }, ...prev]);
+        const mapped = mapDbOrder(payload.new);
+        setOrders(prev => [{ ...mapped, time: 'Vừa xong' }, ...prev]);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload: any) => {
-        const o = payload.new as any;
-        const localStatus = DB_TO_LOCAL[o.status] ?? o.status;
-        const colorFor = (s: string) => s === 'pending' ? 'gray' : s === 'producing' ? 'blue' : s === 'issue' ? 'purple' : s === 'qc' ? 'green' : s === 'shipping' ? 'amber' : s === 'delivered' ? 'emerald' : s === 'cancelled' ? 'red' : 'gray';
+        // Realtime UPDATE payload không chắc có đầy đủ field (một số config chỉ trả PK + changed cols).
+        // Re-fetch full row cho chắc — hoặc nếu không, merge status thôi.
+        const mapped = mapDbOrder(payload.new);
         setOrders(prev => prev.map(existing =>
-          existing.id === o.id
-            ? { ...existing, status: localStatus, color: colorFor(localStatus) }
-            : existing
+          existing.id === mapped.id ? { ...existing, ...mapped } : existing
         ));
       })
       .subscribe((status: string, err?: Error) => {
@@ -2365,11 +2366,24 @@ function AdminDashboard() {
               <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex gap-4">
                 <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-xl shrink-0">{orderModal.avatar}</div>
                 <div className="space-y-1 text-sm flex-1">
-                  <p className="font-bold text-gray-900">{orderModal.name}</p>
-                  <p className="text-gray-600">📞 0987 654 321</p>
-                  <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-100">
-                    <p className="text-gray-700 text-xs">Landmark 81, Vinhomes Central Park, Bình Thạnh, TP.HCM</p>
-                  </div>
+                  <p className="font-bold text-gray-900">{orderModal.name || 'Khách hàng'}</p>
+                  {orderModal.phone && (
+                    <p className="text-gray-600">
+                      📞 <a href={`tel:${orderModal.phone}`} className="hover:underline">{orderModal.phone}</a>
+                    </p>
+                  )}
+                  {orderModal.email && (
+                    <p className="text-gray-600">
+                      ✉️ <a href={`mailto:${orderModal.email}`} className="hover:underline text-blue-600">{orderModal.email}</a>
+                    </p>
+                  )}
+                  {orderModal.address ? (
+                    <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-100">
+                      <p className="text-gray-700 text-xs">{orderModal.address}</p>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-gray-400 italic">(Chưa có địa chỉ)</p>
+                  )}
                 </div>
               </div>
 
