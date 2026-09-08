@@ -4,15 +4,42 @@ Dự án web thêu tay thủ công. Next.js 14 (static export) + Supabase + Clou
 Code này được sửa từ **2 máy khác nhau** (nhà + công ty), mỗi máy có phiên Claude Code riêng.
 Đọc kỹ phần dưới TRƯỚC KHI code hoặc deploy để tránh lặp lại các sự cố đã từng xảy ra.
 
-## Bắt buộc: trước khi bắt đầu sửa code
+## Bắt buộc: trước khi bắt đầu sửa code — Sync workflow 2 máy
+
+Code này sửa từ **2 máy khác nhau** (nhà + công ty). Mỗi phiên Claude Code MỚI phải làm đủ
+các bước sau, theo đúng thứ tự, trước khi động vào code — kể cả khi tưởng chừng chỉ sửa 1
+dòng nhỏ:
 
 ```bash
+# 1. Pull code mới nhất
 git pull origin master
+
+# 2. Xem commit từ lần cuối làm việc — hiểu máy kia đã đổi gì
+git log --oneline -10
+
+# 3. Xem migration mới (nếu có) — có thể cần chạy trong Supabase Dashboard
+ls supabase/migrations/ | tail -3
+
+# 4. Đọc CLAUDE.md (file này) — máy kia có thể đã thêm hướng dẫn mới
+#    Chú ý các dòng "từ 2026-XX-XX" và "Bug X" ghi lại quyết định + nguyên nhân gốc
+
+# 5. Cài lại deps (npm ci không đổi lock, an toàn nếu deps chưa đổi)
+npm ci
 ```
 
-Luôn pull trước. Đã có tình huống 1 phiên xoá 1 đoạn code có chủ đích (bảo mật), phiên kia hiểu nhầm
-là "mất code do lỗi merge" rồi tự khôi phục lại — gây quay vòng sự cố. **Nếu thấy 1 đoạn code bị xoá
-mà không rõ lý do, hãy đọc commit message gần nhất (`git log -3 -p -- <file>`) trước khi khôi phục lại.**
+**Rule đã có sẵn tài nguyên bên ngoài code**: GitHub Secrets, Cloudflare Pages settings,
+Supabase RLS policies, admin accounts... KHÔNG cần pull vì đã lưu ở cloud service (share
+giữa 2 máy tự nhiên). Nhưng nếu MÁY kia vừa thay đổi 1 trong các thứ đó, họ PHẢI ghi lại
+trong CLAUDE.md (kèm ngày) để máy này biết.
+
+**Rule đã có sự cố merge**: Đã có tình huống 1 phiên xoá 1 đoạn code có chủ đích (bảo mật),
+phiên kia hiểu nhầm là "mất code do lỗi merge" rồi tự khôi phục lại — gây quay vòng sự cố.
+**Nếu thấy 1 đoạn code bị xoá mà không rõ lý do, đọc commit message gần nhất
+(`git log -3 -p -- <file>`) trước khi khôi phục lại.**
+
+**Rule commit + push**: Xong việc nào (dù nhỏ) → `git add -A && git commit -m "..." && git push`
+ngay, đừng dồn. Máy kia có thể mở lại repo bất cứ lúc nào, dồn nhiều commit chưa push tăng
+nguy cơ conflict.
 
 ## Deploy production — TỰ ĐỘNG qua GitHub Actions (từ 2026-09-08)
 
@@ -68,9 +95,19 @@ console.log('OK:', text.includes('etbtzznxkedbdeihoqmp'), '| BỊ ĐÈ:', text.i
 
 ### Thay đổi schema/RLS
 Viết thành file migration mới trong `supabase/migrations/`, đánh số thứ tự tiếp theo (hiện đã có
-001–005). Không sửa trực tiếp `schema.sql` cho phần đã deploy — chỉ cập nhật `schema.sql` để phản ánh
+001–007). Không sửa trực tiếp `schema.sql` cho phần đã deploy — chỉ cập nhật `schema.sql` để phản ánh
 state mới nhất (dùng cho project mới tạo từ đầu). Chạy migration trong Supabase Dashboard → SQL Editor,
 tab query mới mỗi lần.
+
+**Sync migration giữa 2 máy**: Supabase là 1 project chung (`etbtzznxkedbdeihoqmp`) — migration
+chạy 1 lần từ máy nào cũng được, cả 2 máy đều thấy hiệu ứng ngay. Nhưng file `.sql` phải được
+commit vào repo để máy kia biết migration đó đã tồn tại (đừng chỉ chạy rồi quên commit).
+
+**Bug 2026-09-08 — Bị đè đơn / không hiện realtime**: `007_fix_guest_checkout_for_authenticated.sql`
+sửa RLS cho phép user đang đăng nhập cũng đặt được guest order. Trước đó policy `to anon` chặn
+insert khi user đã login → frontend fallback localStorage âm thầm → đơn không vào DB → admin
+Kanban không thấy. Kèm theo, `src/lib/orders.ts` đã bỏ silent fallback, giờ THROW lỗi rõ để
+tránh "success giả".
 
 ## Khi gặp lỗi khó hiểu — thứ tự chẩn đoán
 

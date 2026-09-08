@@ -129,11 +129,15 @@ export async function createGuestOrder(
   if (!guest.address.district) throw new Error("Vui lòng nhập quận/huyện");
   if (!guest.address.province) throw new Error("Vui lòng nhập tỉnh/thành");
 
-  // Thử Supabase — nếu offline, dùng localStorage fallback
+  // Thử Supabase — CHỈ fallback localStorage khi Supabase CHƯA CONFIG.
+  // Nếu Supabase đã config nhưng insert lỗi (RLS chặn, network, v.v.) → THROW
+  // để user thấy lỗi thật thay vì nhận "thành công giả" mà đơn không vào DB.
   let supabase: ReturnType<typeof getSupabase>;
   try {
     supabase = getSupabase();
   } catch {
+    // Supabase chưa config (dev/staging without env vars) → dùng local
+    console.warn("[createGuestOrder] Supabase not configured, using localStorage fallback");
     return createLocalOrder(guest, cartItems);
   }
 
@@ -163,9 +167,22 @@ export async function createGuestOrder(
     .select("id, order_number, total_amount, status")
     .single();
 
-  // Nếu Supabase lỗi (network/config) → fallback local
-  if (orderErr) return createLocalOrder(guest, cartItems);
-  if (!order) return createLocalOrder(guest, cartItems);
+  // Supabase trả lỗi → THROW để user biết (không giả vờ thành công như trước)
+  if (orderErr) {
+    console.error("[createGuestOrder] Supabase INSERT failed:", orderErr);
+    // Message hữu ích cho từng loại lỗi phổ biến
+    if (orderErr.code === "42501" || orderErr.message?.includes("row-level security")) {
+      throw new Error(
+        "Không thể tạo đơn hàng do quyền truy cập bị chặn. " +
+        "Nếu bạn đang đăng nhập admin, hãy đăng xuất rồi thử lại (guest checkout yêu cầu chưa đăng nhập). " +
+        `Chi tiết: ${orderErr.message}`
+      );
+    }
+    throw new Error(`Không tạo được đơn hàng: ${orderErr.message}`);
+  }
+  if (!order) {
+    throw new Error("Không tạo được đơn hàng: Supabase trả về rỗng (kiểm tra RLS policy).");
+  }
 
   // 2. Resolve product_id thật qua slug — trang sản phẩm là static (data.ts),
   // nên cartItems.productId là id giả ("p1"...) không khớp UUID thật trong DB.

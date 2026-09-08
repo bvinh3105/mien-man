@@ -514,60 +514,78 @@ function AdminDashboard() {
     cancelled:     'cancelled',
   };
 
-  // ─── Supabase Realtime subscription ─────────────────────
-  // Lazy: chỉ khởi tạo client-side bên trong useEffect / handlers
+  // ─── Supabase Realtime subscription + diagnostics ───────
   const channelRef = useRef<any>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [rtStatus,   setRtStatus]   = useState<'idle'|'connecting'|'live'|'error'>('idle');
+  const [dbOrderCount, setDbOrderCount] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Helper an toàn: trả về null nếu chưa configure (tránh throw lúc SSG)
   function getClient() {
     try { return getSupabase() as any; } catch { return null; }
   }
 
+  // Extract fetch logic vào 1 hàm để cả useEffect và nút "Làm mới" dùng được
+  async function fetchOrders() {
+    const supabase = getClient();
+    if (!supabase) {
+      setFetchError('Supabase chưa được cấu hình (thiếu NEXT_PUBLIC_SUPABASE_URL)');
+      return;
+    }
+    setRefreshing(true);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, order_number, status, total_amount, created_at, guest_name, guest_phone, payment_method, note')
+        .not('status', 'in', '(delivered,cancelled)')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error('[admin fetchOrders] Supabase error:', error);
+        setFetchError(`${error.code ?? 'ERR'}: ${error.message}`);
+        setDbOrderCount(0);
+        return;
+      }
+      setFetchError(null);
+      setDbOrderCount(data?.length ?? 0);
+
+      const colorFor = (s: string) =>
+        s === 'pending' ? 'gray' : s === 'producing' ? 'blue' : s === 'issue' ? 'purple' :
+        s === 'qc' ? 'green' : s === 'shipping' ? 'amber' : s === 'delivered' ? 'emerald' :
+        s === 'cancelled' ? 'red' : 'gray';
+
+      const mapped = (data ?? []).map((o: any) => ({
+        id: o.id,
+        order_number: o.order_number,
+        status: DB_TO_LOCAL[o.status] ?? o.status,
+        color: colorFor(DB_TO_LOCAL[o.status] ?? o.status),
+        name: o.guest_name ?? 'Khách hàng',
+        price: (o.total_amount ?? 0).toLocaleString('vi-VN') + 'đ',
+        paymentMethod: (o.payment_method ?? 'cod').toUpperCase(),
+        time: new Date(o.created_at).toLocaleString('vi-VN'),
+        items: o.note || 'Đơn hàng',
+        avatar: (o.guest_name ?? 'KH').substring(0, 2).toUpperCase(),
+        assignee: null,
+        createdAt: o.created_at ? new Date(o.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+      }));
+      setOrders(mapped);
+    } catch (e) {
+      console.error('[admin fetchOrders] exception:', e);
+      setFetchError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   useEffect(() => {
     const supabase = getClient();
-    if (!supabase) return; // Supabase chưa config → bỏ qua, dùng mock data
+    if (!supabase) return;
 
-    // 1. Fetch initial live orders
-    async function fetchOrders() {
-      try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('id, order_number, status, total_amount, created_at, guest_name, guest_phone, payment_method, note')
-          .not('status', 'in', '(delivered,cancelled)')
-          .order('created_at', { ascending: false })
-          .limit(50);
-
-        // Chỉ fallback mock khi thật sự lỗi (Supabase offline/chưa cấu hình).
-        // 0 đơn thật là trạng thái hợp lệ (DB đã kết nối, chỉ là chưa/không còn đơn nào) — không fallback.
-        if (error || !data) return;
-
-        const colorFor = (s: string) =>
-          s === 'pending' ? 'gray' : s === 'producing' ? 'blue' : s === 'issue' ? 'purple' :
-          s === 'qc' ? 'green' : s === 'shipping' ? 'amber' : s === 'delivered' ? 'emerald' :
-          s === 'cancelled' ? 'red' : 'gray';
-
-        const mapped = data.map((o: any) => ({
-          id: o.id,
-          order_number: o.order_number,
-          status: DB_TO_LOCAL[o.status] ?? o.status,
-          color: colorFor(DB_TO_LOCAL[o.status] ?? o.status),
-          name: o.guest_name ?? 'Khách hàng',
-          price: (o.total_amount ?? 0).toLocaleString('vi-VN') + 'đ',
-          paymentMethod: (o.payment_method ?? 'cod').toUpperCase(),
-          time: new Date(o.created_at).toLocaleString('vi-VN'),
-          items: o.note || 'Đơn hàng',
-          avatar: (o.guest_name ?? 'KH').substring(0, 2).toUpperCase(),
-          assignee: null,
-          createdAt: o.created_at ? new Date(o.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
-        }));
-        setOrders(mapped);
-      } catch {
-        // Supabase offline → giữ mock data
-      }
-    }
     fetchOrders();
 
-    // 2. Subscribe realtime
+    // 2. Subscribe realtime (log status để biết realtime có kết nối được không)
+    setRtStatus('connecting');
     const channel = supabase.channel('admin-kanban')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload: any) => {
         const o = payload.new as any;
@@ -598,7 +616,14 @@ function AdminDashboard() {
             : existing
         ));
       })
-      .subscribe();
+      .subscribe((status: string, err?: Error) => {
+        // Cập nhật rtStatus để hiện visible trên UI
+        console.log('[admin realtime] status:', status, err ?? '');
+        if (status === 'SUBSCRIBED')          setRtStatus('live');
+        else if (status === 'CHANNEL_ERROR')  setRtStatus('error');
+        else if (status === 'TIMED_OUT')      setRtStatus('error');
+        else if (status === 'CLOSED')         setRtStatus('idle');
+      });
 
     channelRef.current = channel;
     return () => { supabase.removeChannel(channel); };
@@ -920,7 +945,32 @@ function AdminDashboard() {
                 Mời thành viên
               </button>
             )}
-            {activeTab === 'orders' && <button className="bg-gray-900 text-white px-4 py-2 rounded-md text-sm font-bold hover:bg-gray-800">Tạo đơn thủ công</button>}
+            {activeTab === 'orders' && (
+              <div className="flex items-center gap-2">
+                {/* Realtime status pill */}
+                <span
+                  className={
+                    'text-[11px] font-medium px-2 py-1 rounded ' +
+                    (rtStatus === 'live'       ? 'bg-emerald-100 text-emerald-700' :
+                     rtStatus === 'error'      ? 'bg-red-100 text-red-700' :
+                     rtStatus === 'connecting' ? 'bg-amber-100 text-amber-700' :
+                                                 'bg-gray-100 text-gray-600')
+                  }
+                  title={`Realtime: ${rtStatus}${dbOrderCount !== null ? ` · DB có ${dbOrderCount} đơn active` : ''}`}
+                >
+                  ● {rtStatus === 'live' ? 'Realtime OK' : rtStatus === 'error' ? 'Realtime lỗi' : rtStatus === 'connecting' ? 'Đang kết nối…' : 'Chưa kết nối'}
+                </span>
+                <button
+                  onClick={fetchOrders}
+                  disabled={refreshing}
+                  className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+                  title="Fetch lại danh sách đơn từ Supabase"
+                >
+                  {refreshing ? 'Đang tải…' : '↻ Làm mới'}
+                </button>
+                <button className="bg-gray-900 text-white px-4 py-2 rounded-md text-sm font-bold hover:bg-gray-800">Tạo đơn thủ công</button>
+              </div>
+            )}
             {activeTab === 'products' && <button className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-bold hover:bg-blue-700" onClick={() => setProductModal({})}>+ Thêm sản phẩm</button>}
             {activeTab === 'customers' && <button className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-bold hover:bg-gray-50 flex items-center gap-2">Xuất CSV</button>}
             {activeTab === 'history' && (
@@ -1243,6 +1293,31 @@ function AdminDashboard() {
               onDragEnd={handleDragEnd}
             >
               <div className="flex flex-col h-full bg-gray-50">
+                {/* Error banner khi fetch lỗi — làm nổi bật để không âm thầm show Kanban trống */}
+                {fetchError && (
+                  <div className="bg-red-50 border-b-2 border-red-200 px-6 py-3 text-sm text-red-800 shrink-0 flex items-start gap-3">
+                    <span className="text-lg leading-none">⚠️</span>
+                    <div className="flex-1">
+                      <div className="font-bold">Không đọc được đơn hàng từ Supabase</div>
+                      <div className="text-xs mt-0.5 font-mono">{fetchError}</div>
+                      <div className="text-xs mt-1 text-red-700">
+                        Nếu mã lỗi là <code className="bg-red-100 px-1 rounded">42501</code> hoặc chứa "row-level security":
+                        tài khoản đang đăng nhập có thể chưa được set <code className="bg-red-100 px-1 rounded">role=&apos;admin&apos;</code> trong bảng <code className="bg-red-100 px-1 rounded">profiles</code>.
+                        Vào Supabase → SQL Editor chạy:
+                        <code className="block bg-red-100 mt-1 p-1.5 rounded text-[11px]">update public.profiles set role=&apos;admin&apos; where id = auth.uid();</code>
+                        (thay <code>auth.uid()</code> bằng UUID user thật lấy từ tab Authentication).
+                      </div>
+                    </div>
+                    <button onClick={() => setFetchError(null)} className="text-red-500 hover:text-red-700 text-lg leading-none">×</button>
+                  </div>
+                )}
+                {/* Info banner khi DB có 0 đơn (không phải lỗi, chỉ báo cho biết) */}
+                {!fetchError && dbOrderCount === 0 && (
+                  <div className="bg-blue-50 border-b border-blue-200 px-6 py-2 text-xs text-blue-700 shrink-0">
+                    ℹ️ Supabase kết nối OK, nhưng chưa có đơn nào đang active (đã lọc bỏ delivered/cancelled). Đơn mới sẽ tự hiện qua realtime.
+                  </div>
+                )}
+
                 {/* Summary bar */}
                 <div className="px-6 py-3 bg-white border-b border-gray-200 flex items-center gap-4 text-xs overflow-x-auto shrink-0">
                   {COLUMNS.map(col => {
