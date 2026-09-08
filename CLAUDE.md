@@ -21,13 +21,15 @@ mà không rõ lý do, hãy đọc commit message gần nhất (`git log -3 -p -
 GitHub Secrets, KHÔNG phải Cloudflare Dashboard) → `wrangler pages deploy`. Xem tiến độ tại
 `https://github.com/bvinh3105/mien-man/actions`.
 
-**Vì sao đổi sang cách này**: Cloudflare Pages có bật Automatic deployments (tự build khi push
-code lên GitHub) nhưng đã xác nhận nhiều lần: bản tự động build ra **placeholder Supabase URL**
-(không đọc được biến môi trường đã set trên Cloudflare Dashboard) — xảy ra lặp lại nhiều lần,
-kể cả với commit không đụng gì tới code app. Thay vì phải nhớ chạy `wrangler deploy` thủ công
-sau MỖI lần push (dễ quên, đã từng quên → production lỗi kéo dài), giờ để GitHub Actions tự làm
-việc đó — không cần tắt Automatic deployments của Cloudflare, workflow GitHub luôn chạy sau và
-là bản thắng cuối cùng.
+**Cloudflare Pages "Automatic Deployments" đã bị TẮT** (Settings → Builds & deployments →
+Branch control → uncheck "Enable automatic production branch deployments" + Preview branch =
+None). Đây là bước quan trọng — nếu không tắt, Cloudflare tự build song song ra placeholder
+URL rồi deploy SAU GH Actions → đè lên bản đúng (race condition, 100% các lần Cloudflare thắng
+vì build đơn giản hơn). Đã xảy ra rất nhiều lần trước khi tắt.
+
+Nếu sau này ai đó bật lại (vô tình hoặc do reset settings), sẽ thấy hiện tượng cũ: production
+serve placeholder URL, login báo "Chức năng đăng nhập tài khoản đang được cập nhật". Vào lại
+Cloudflare Dashboard → Settings → Builds & deployments tắt lại là xong.
 
 **Setup 1 lần (đã làm — chỉ cần biết khi đổi máy/repo mới)**: 4 GitHub Secrets tại
 Settings → Secrets and variables → Actions:
