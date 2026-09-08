@@ -14,24 +14,31 @@ Luôn pull trước. Đã có tình huống 1 phiên xoá 1 đoạn code có ch�
 là "mất code do lỗi merge" rồi tự khôi phục lại — gây quay vòng sự cố. **Nếu thấy 1 đoạn code bị xoá
 mà không rõ lý do, hãy đọc commit message gần nhất (`git log -3 -p -- <file>`) trước khi khôi phục lại.**
 
-## Bắt buộc: deploy production
+## Deploy production — TỰ ĐỘNG qua GitHub Actions (từ 2026-09-08)
 
-**Luôn deploy thủ công sau khi code xong — KHÔNG chỉ dựa vào git push:**
+**Không cần chạy `wrangler deploy` thủ công nữa.** Mỗi lần `git push` lên `master`,
+`.github/workflows/deploy.yml` tự chạy: `npm ci` → `npm run build` (với env vars lấy từ
+GitHub Secrets, KHÔNG phải Cloudflare Dashboard) → `wrangler pages deploy`. Xem tiến độ tại
+`https://github.com/bvinh3105/mien-man/actions`.
 
+**Vì sao đổi sang cách này**: Cloudflare Pages có bật Automatic deployments (tự build khi push
+code lên GitHub) nhưng đã xác nhận nhiều lần: bản tự động build ra **placeholder Supabase URL**
+(không đọc được biến môi trường đã set trên Cloudflare Dashboard) — xảy ra lặp lại nhiều lần,
+kể cả với commit không đụng gì tới code app. Thay vì phải nhớ chạy `wrangler deploy` thủ công
+sau MỖI lần push (dễ quên, đã từng quên → production lỗi kéo dài), giờ để GitHub Actions tự làm
+việc đó — không cần tắt Automatic deployments của Cloudflare, workflow GitHub luôn chạy sau và
+là bản thắng cuối cùng.
+
+**Setup 1 lần (đã làm — chỉ cần biết khi đổi máy/repo mới)**: 4 GitHub Secrets tại
+Settings → Secrets and variables → Actions:
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `CLOUDFLARE_API_TOKEN`,
+`CLOUDFLARE_ACCOUNT_ID`.
+
+**Nếu vẫn muốn deploy thủ công** (test nhanh, hoặc GitHub Actions đang lỗi):
 ```bash
 npm run build
 npx wrangler pages deploy out --project-name=mien-man --commit-dirty=true
 ```
-
-**Vì sao bắt buộc bước này**: Cloudflare Pages có bật Automatic deployments (tự build khi push code
-lên GitHub). Đã xác nhận nhiều lần: bản tự động build ra **placeholder Supabase URL** (không đọc được
-biến môi trường đã set trên Cloudflare Dashboard) — xảy ra 100% các lần, kể cả với commit không đụng
-gì tới code app. Chủ dự án đã quyết định **giữ nguyên** Automatic deployments (không tắt), nên:
-
-- Sau MỌI lần `git push` (của mình hoặc của máy kia), coi như production **có thể đã bị đè bằng bản lỗi**.
-- Luôn chạy lại `wrangler pages deploy` ngay sau khi push để phục hồi bản đúng.
-- Nếu KHÔNG có gì cần build lại (chỉ vừa deploy xong, code không đổi), vẫn có thể chạy lại lệnh trên —
-  wrangler sẽ tự nhận ra file không đổi ("already uploaded") và chỉ mất vài giây.
 
 **Cách nhận biết production đang bị đè bản lỗi** (không cần đăng nhập):
 ```js

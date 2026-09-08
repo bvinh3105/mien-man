@@ -1,41 +1,38 @@
 name: Deploy to Cloudflare Pages
 
+# Chạy tự động mỗi khi push lên master — build với đúng biến môi trường lấy từ
+# GitHub Secrets (không phụ thuộc Cloudflare Dashboard đọc đúng hay không, vốn
+# là nguyên nhân production hay bị đè bằng placeholder URL). Không cần tắt
+# Automatic Deployments của Cloudflare — workflow này luôn chạy sau và ghi đè
+# lại bằng bản đúng, y hệt cơ chế thủ công trước đây nhưng giờ tự động.
 on:
   push:
     branches: [master]
-  workflow_dispatch:   # cho phép chạy thủ công từ GitHub UI
+  workflow_dispatch: # cho phép bấm "Run workflow" thủ công trên GitHub nếu cần
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Build & Deploy
     permissions:
       contents: read
-      deployments: write
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: 20
+          cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
 
-      - name: Build Next.js (static export)
+      - name: Build (Next.js static export)
         run: npm run build
         env:
-          # Supabase public vars (không sensitive — safe để lộ trong build)
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy out --project-name=mien-man --commit-dirty=true
+        run: npx wrangler pages deploy out --project-name=mien-man --commit-dirty=true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
