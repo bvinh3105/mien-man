@@ -1,27 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
 import { createGuestOrder, fmtVnd, type GuestInfo } from "@/lib/orders";
-
-const PROVINCES = [
-  "Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Hải Phòng", "Cần Thơ",
-  "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu",
-  "Bắc Ninh", "Bến Tre", "Bình Định", "Bình Dương", "Bình Phước",
-  "Bình Thuận", "Cà Mau", "Cao Bằng", "Đắk Lắk", "Đắk Nông",
-  "Điện Biên", "Đồng Nai", "Đồng Tháp", "Gia Lai", "Hà Giang",
-  "Hà Nam", "Hà Tĩnh", "Hải Dương", "Hậu Giang", "Hòa Bình",
-  "Hưng Yên", "Khánh Hòa", "Kiên Giang", "Kon Tum", "Lai Châu",
-  "Lâm Đồng", "Lạng Sơn", "Lào Cai", "Long An", "Nam Định",
-  "Nghệ An", "Ninh Bình", "Ninh Thuận", "Phú Thọ", "Phú Yên",
-  "Quảng Bình", "Quảng Nam", "Quảng Ngãi", "Quảng Ninh", "Quảng Trị",
-  "Sóc Trăng", "Sơn La", "Tây Ninh", "Thái Bình", "Thái Nguyên",
-  "Thanh Hóa", "Thừa Thiên Huế", "Tiền Giang", "Trà Vinh", "Tuyên Quang",
-  "Vĩnh Long", "Vĩnh Phúc", "Yên Bái",
-];
+import { listProvinces, listDistricts, listWards, type AdminUnit } from "@/lib/vnaddress";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -35,12 +20,54 @@ export default function CheckoutPage() {
     name: profile?.full_name ?? "",
     phone: profile?.phone ?? "",
     email: user?.email ?? "",
-    address: { street: "", ward: "", district: "", province: "Hà Nội" },
+    address: { street: "", ward: "", district: "", province: "" },
     note: "",
     paymentMethod: "cod",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  // Cascading dropdown state — chỉ giữ CODE ở đây, name lưu thẳng vào form.address
+  const [provinces, setProvinces] = useState<AdminUnit[]>([]);
+  const [districts, setDistricts] = useState<AdminUnit[]>([]);
+  const [wards,     setWards]     = useState<AdminUnit[]>([]);
+  const [provinceCode, setProvinceCode] = useState<number | null>(null);
+  const [districtCode, setDistrictCode] = useState<number | null>(null);
+  const [addrLoading, setAddrLoading] = useState<'provinces'|'districts'|'wards'|null>('provinces');
+  const [addrApiDown, setAddrApiDown] = useState(false); // true = fallback text input
+
+  // Load tỉnh 1 lần khi mount
+  useEffect(() => {
+    listProvinces()
+      .then(list => { setProvinces(list); setAddrLoading(null); })
+      .catch(err => {
+        console.error('[checkout] listProvinces failed:', err);
+        setAddrApiDown(true);
+        setAddrLoading(null);
+      });
+  }, []);
+
+  // Khi đổi tỉnh → load quận, reset quận/phường/wards state
+  useEffect(() => {
+    if (!provinceCode) return;
+    setAddrLoading('districts');
+    setDistricts([]); setWards([]); setDistrictCode(null);
+    setForm(f => ({ ...f, address: { ...f.address, district: '', ward: '' } }));
+    listDistricts(provinceCode)
+      .then(list => { setDistricts(list); setAddrLoading(null); })
+      .catch(err => { console.error('[checkout] listDistricts failed:', err); setAddrLoading(null); });
+  }, [provinceCode]);
+
+  // Khi đổi quận → load phường
+  useEffect(() => {
+    if (!districtCode) return;
+    setAddrLoading('wards');
+    setWards([]);
+    setForm(f => ({ ...f, address: { ...f.address, ward: '' } }));
+    listWards(districtCode)
+      .then(list => { setWards(list); setAddrLoading(null); })
+      .catch(err => { console.error('[checkout] listWards failed:', err); setAddrLoading(null); });
+  }, [districtCode]);
 
   function set(field: keyof GuestInfo, val: string) {
     setForm(f => ({ ...f, [field]: val }));
@@ -134,33 +161,92 @@ export default function CheckoutPage() {
               <span className="w-6 h-6 bg-sage-500 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span>
               Địa chỉ giao hàng
             </h2>
+            {addrApiDown && (
+              <div className="mb-3 p-2 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded">
+                ⚠️ Không tải được danh sách tỉnh/quận từ server. Vui lòng nhập tay — nhớ ghi đúng để giao được hàng.
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-sage-700 mb-1">Tỉnh / Thành phố <span className="text-red-500">*</span></label>
-                <select
-                  value={form.address.province}
-                  onChange={e => setAddr("province", e.target.value)}
-                  required
-                  className="w-full px-3 py-2.5 border border-sage-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 text-sm bg-white"
-                >
-                  {PROVINCES.map(p => <option key={p}>{p}</option>)}
-                </select>
+                {addrApiDown ? (
+                  <input
+                    value={form.address.province} onChange={e => setAddr("province", e.target.value)}
+                    required placeholder="Hà Nội"
+                    className="w-full px-3 py-2.5 border border-sage-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 text-sm"
+                  />
+                ) : (
+                  <select
+                    value={provinceCode ?? ""}
+                    onChange={e => {
+                      const code = Number(e.target.value) || null;
+                      setProvinceCode(code);
+                      const p = provinces.find(x => x.code === code);
+                      setAddr("province", p?.name ?? "");
+                    }}
+                    required
+                    disabled={addrLoading === 'provinces'}
+                    className="w-full px-3 py-2.5 border border-sage-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 text-sm bg-white disabled:bg-gray-50"
+                  >
+                    <option value="">{addrLoading === 'provinces' ? '— Đang tải…' : '— Chọn tỉnh/thành —'}</option>
+                    {provinces.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
+                  </select>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-sage-700 mb-1">Quận / Huyện <span className="text-red-500">*</span></label>
-                <input
-                  value={form.address.district} onChange={e => setAddr("district", e.target.value)}
-                  required placeholder="Hoàn Kiếm"
-                  className="w-full px-3 py-2.5 border border-sage-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 text-sm"
-                />
+                {addrApiDown ? (
+                  <input
+                    value={form.address.district} onChange={e => setAddr("district", e.target.value)}
+                    required placeholder="Hoàn Kiếm"
+                    className="w-full px-3 py-2.5 border border-sage-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 text-sm"
+                  />
+                ) : (
+                  <select
+                    value={districtCode ?? ""}
+                    onChange={e => {
+                      const code = Number(e.target.value) || null;
+                      setDistrictCode(code);
+                      const d = districts.find(x => x.code === code);
+                      setAddr("district", d?.name ?? "");
+                    }}
+                    required
+                    disabled={!provinceCode || addrLoading === 'districts'}
+                    className="w-full px-3 py-2.5 border border-sage-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 text-sm bg-white disabled:bg-gray-50 disabled:text-gray-400"
+                  >
+                    <option value="">
+                      {!provinceCode        ? '— Chọn tỉnh trước —' :
+                       addrLoading === 'districts' ? '— Đang tải…' :
+                                                      '— Chọn quận/huyện —'}
+                    </option>
+                    {districts.map(d => <option key={d.code} value={d.code}>{d.name}</option>)}
+                  </select>
+                )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-sage-700 mb-1">Phường / Xã <span className="text-sage-400 font-normal">(tuỳ chọn)</span></label>
-                <input
-                  value={form.address.ward ?? ""} onChange={e => setAddr("ward", e.target.value)}
-                  placeholder="Phường Tràng Tiền"
-                  className="w-full px-3 py-2.5 border border-sage-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 text-sm"
-                />
+                <label className="block text-sm font-medium text-sage-700 mb-1">Phường / Xã <span className="text-red-500">*</span></label>
+                {addrApiDown ? (
+                  <input
+                    value={form.address.ward ?? ""} onChange={e => setAddr("ward", e.target.value)}
+                    required placeholder="Phường Tràng Tiền"
+                    className="w-full px-3 py-2.5 border border-sage-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 text-sm"
+                  />
+                ) : (
+                  <select
+                    value={form.address.ward ?? ""}
+                    onChange={e => setAddr("ward", e.target.value)}
+                    required
+                    disabled={!districtCode || addrLoading === 'wards'}
+                    className="w-full px-3 py-2.5 border border-sage-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 text-sm bg-white disabled:bg-gray-50 disabled:text-gray-400"
+                  >
+                    <option value="">
+                      {!districtCode        ? '— Chọn quận trước —' :
+                       addrLoading === 'wards' ? '— Đang tải…' :
+                                                  '— Chọn phường/xã —'}
+                    </option>
+                    {wards.map(w => <option key={w.code} value={w.name}>{w.name}</option>)}
+                  </select>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-sage-700 mb-1">Số nhà, tên đường <span className="text-red-500">*</span></label>
